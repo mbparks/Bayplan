@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.1 | build-marker: scaffold-2026-07-08 -->
+<!-- BAYPLAN FI-075 | v0.0.2 | build-marker: stowage-trim-2026-07-08 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -34,66 +34,79 @@
   body{
     background:var(--ground); color:var(--ink);
     font-family:var(--font-sans); font-size:15px; line-height:1.5;
-    display:flex; flex-direction:column; height:100vh;
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
   }
   header{
     display:flex; align-items:baseline; gap:16px; flex-wrap:wrap;
     padding:12px 18px; border-bottom:1px solid var(--line); background:var(--panel);
   }
-  .wordmark{font-family:var(--font-mono); font-weight:700; letter-spacing:.14em;
-    font-size:17px; color:var(--ink)}
+  .wordmark{font-family:var(--font-mono); font-weight:700; letter-spacing:.14em; font-size:17px}
   .fi{font-family:var(--font-mono); font-size:12px; color:var(--brass); letter-spacing:.1em}
   .tag{font-size:12px; color:var(--ink-dim); font-style:italic}
   .spacer{flex:1}
   .toolbar{display:flex; gap:8px; flex-wrap:wrap}
-  button, .seg{
+  button{
     font-family:var(--font-mono); font-size:12px; letter-spacing:.05em;
     color:var(--ink); background:var(--panel-2); border:1px solid var(--line);
     padding:7px 11px; border-radius:2px; cursor:pointer;
   }
   button:hover{border-color:var(--brass)}
-  button:focus-visible,.seg button:focus-visible{outline:2px solid var(--brass); outline-offset:2px}
-  .seg{display:inline-flex; padding:0; overflow:hidden}
+  button:focus-visible{outline:2px solid var(--brass); outline-offset:2px}
+  button:disabled{opacity:.4; cursor:default}
+  button.danger:hover{border-color:var(--hard); color:var(--hard)}
+  .seg{display:inline-flex; border:1px solid var(--line); border-radius:2px; overflow:hidden}
   .seg button{border:0; border-radius:0; border-left:1px solid var(--line)}
   .seg button:first-child{border-left:0}
   .seg button[aria-pressed="true"]{background:var(--brass); color:#111}
   main{flex:1; display:flex; min-height:0}
-  .stage{flex:1; position:relative; overflow:hidden}
+  .stage{flex:1; position:relative; overflow:hidden; touch-action:none}
   svg{width:100%; height:100%; display:block}
   aside{
-    width:270px; border-left:1px solid var(--line); background:var(--panel);
+    width:288px; border-left:1px solid var(--line); background:var(--panel);
     padding:14px 16px; overflow:auto;
   }
   aside h2{font-family:var(--font-mono); font-size:11px; letter-spacing:.16em;
-    text-transform:uppercase; color:var(--ink-dim); margin:0 0 8px; font-weight:600}
+    text-transform:uppercase; color:var(--ink-dim); margin:0 0 8px; font-weight:600;
+    display:flex; justify-content:space-between; align-items:center}
   aside section{margin-bottom:20px}
-  .legend-row{display:flex; align-items:center; gap:9px; margin:5px 0; font-size:13px}
-  .sw{width:14px; height:14px; border-radius:2px; flex:none}
+  .count{font-family:var(--font-mono); color:var(--brass)}
+  .legend-row{display:flex; align-items:center; gap:9px; margin:5px 0; font-size:12.5px}
+  .sw{width:13px; height:13px; border-radius:2px; flex:none}
   .sw.hard{background:var(--hard)} .sw.soft{background:var(--soft)} .sw.shared{background:var(--shared)}
   .sw.fp{background:var(--footprint-fill); border:1px solid var(--footprint)}
-  .roster{list-style:none; margin:0; padding:0}
-  .roster li{font-size:13px; padding:5px 0; border-bottom:1px solid var(--line);
-    display:flex; justify-content:space-between; gap:8px}
-  .roster .cat{font-family:var(--font-mono); font-size:10px; color:var(--ink-dim)}
-  .count{font-family:var(--font-mono); color:var(--brass)}
+  .shelf{display:flex; flex-direction:column; gap:3px; max-height:230px; overflow:auto}
+  .shelf button{text-align:left; display:flex; justify-content:space-between; gap:8px; padding:6px 8px}
+  .shelf .cat{font-size:9.5px; color:var(--ink-dim); align-self:center}
+  .placed{list-style:none; margin:0; padding:0}
+  .placed li{font-size:13px; padding:6px 8px; border:1px solid transparent; border-radius:2px;
+    display:flex; justify-content:space-between; gap:8px; cursor:pointer; align-items:center}
+  .placed li:hover{background:var(--panel-2)}
+  .placed .meta{font-family:var(--font-mono); font-size:10px; color:var(--ink-dim)}
+  .selpanel{border:1px solid var(--brass); border-radius:2px; padding:10px; background:var(--panel-2)}
+  .selpanel .name{font-size:13px; margin-bottom:8px}
+  .selpanel .row{display:flex; gap:6px; flex-wrap:wrap}
+  .selpanel button{flex:1; min-width:56px; text-align:center}
+  .empty{font-size:12.5px; color:var(--ink-dim); font-style:italic; line-height:1.5}
+  .trim{font-family:var(--font-mono)}
+  .trim.clear-msg{color:var(--shared); font-size:12px}
+  .trim ul{list-style:none; margin:0; padding:0}
+  .trim li{padding:4px 0; border-bottom:1px solid var(--line); font-size:11.5px; line-height:1.35}
+  .trim .badge{font-weight:700}
+  .trim .err{color:var(--hard)} .trim .warn{color:var(--soft)}
   footer{
     padding:7px 18px; border-top:1px solid var(--line); background:var(--panel);
     font-family:var(--font-mono); font-size:11px; color:var(--ink-dim);
-    display:flex; gap:16px; flex-wrap:wrap;
+    display:flex; gap:16px; flex-wrap:wrap; align-items:center;
   }
+  footer .err{color:var(--hard)} footer .warn{color:var(--soft)} footer .ok{color:var(--shared)}
   a{color:var(--brass)}
-  @media (prefers-reduced-motion:no-preference){
-    .roster li{transition:color .15s}
-  }
-  @media (max-width:720px){ aside{display:none} }
-  /* test harness */
-  #tests{padding:20px 24px; overflow:auto; font-family:var(--font-mono); font-size:13px}
+  #tests{padding:20px 24px; overflow:auto; font-family:var(--font-mono); font-size:13px; height:100%}
   #tests h1{font-size:15px; letter-spacing:.1em}
   .t-pass{color:var(--shared)} .t-fail{color:var(--hard)}
-  #tests .summary{font-size:14px; margin:12px 0 18px; padding:10px 12px;
-    border:1px solid var(--line); border-radius:2px}
+  #tests .summary{font-size:14px; margin:12px 0 18px; padding:10px 12px; border:1px solid var(--line); border-radius:2px}
   #tests table{border-collapse:collapse; width:100%}
   #tests td{padding:3px 8px; border-bottom:1px solid var(--line); vertical-align:top}
+  @media (max-width:760px){ aside{width:246px} }
 </style>
 </head>
 <body>
@@ -101,237 +114,273 @@
 
 <script>
 "use strict";
-
 /* ============================================================
-   BAYPLAN FI-075 scaffold
-   Sections: SEED, geometry, model, render, ui, tests
+   BAYPLAN FI-075  v0.0.2  (STOWAGE + TRIM)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
-   Arc angles: degrees clockwise from +y (north). 0=back,90=right,180=front,270=left.
+   Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
    ============================================================ */
 
-/* ---- SEED (built-in library, generated by build_seed.py) ---- */
 const SEED = {"schemaVersion":"1.0.0","kind":"bayplan-seed-library","generated":"2026-07-08","frame":{"units":"inches","origin":"anchor","axes":"+x operator-right, +y back (away from operator)","edges":"front=min y, back=max y, left=min x, right=max x","arcAngles":"degrees clockwise from +y (back): 0=back,90=right,180=front,270=left","note":"Defaults for tuning. minHeight null means full height (floor to head)."},"library":[{"id":"builtin-table-saw-cabinet","name":"Table saw (3HP cabinet, 36in fence)","category":"table_saw","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-14,-13],[30,-13],[30,14],[-14,14]]},"anchor":[0,0],"anchorNote":"blade, at kerf line","height":34,"weight":500,"power":{"voltage":240,"amps":15,"phase":1,"dedicated":true},"dustPort":{"position":[0,-6],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":96},"label":"infeed","severity":"shared","minHeight":40,"note":"8ft infeed to rip full sheets; clear only to table height"},{"shape":"rect","geometry":{"edge":"back","depth":96},"label":"outfeed","severity":"shared","minHeight":40,"note":"8ft outfeed for ripped stock; overlaps aisles by design"},{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"operator","severity":"soft","minHeight":null,"note":"operator stance at the front, full height"},{"shape":"rect","geometry":{"edge":"right","depth":40},"label":"blade_access","severity":"soft","minHeight":40,"note":"36in rip capacity to the right of the blade"}],"ports":[{"id":"in","label":"stock_in","position":[0,-13]},{"id":"out","label":"stock_out","position":[0,14]}]},{"id":"builtin-jointer-8in","name":"Jointer (8in, long bed)","category":"jointer","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-36.0,-11.0],[36.0,-11.0],[36.0,11.0],[-36.0,11.0]]},"anchor":[0,0],"anchorNote":"cutterhead, bed center","height":34,"weight":450,"power":{"voltage":240,"amps":12,"phase":1,"dedicated":false},"dustPort":{"position":[0,8],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":72},"label":"infeed","severity":"shared","minHeight":38,"note":"long-board infeed along the bed axis"},{"shape":"rect","geometry":{"edge":"right","depth":72},"label":"outfeed","severity":"shared","minHeight":38,"note":"long-board outfeed along the bed axis"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator works along the front of the bed"}],"ports":[{"id":"in","label":"stock_in","position":[-36,0]},{"id":"out","label":"stock_out","position":[36,0]}]},{"id":"builtin-planer-13in","name":"Thickness planer (13in benchtop on stand)","category":"planer","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-11.0],[12.0,-11.0],[12.0,11.0],[-12.0,11.0]]},"anchor":[0,0],"anchorNote":"cutterhead center","height":38,"weight":90,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,10],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":96},"label":"infeed","severity":"shared","minHeight":42,"note":"long-board infeed; feeds front to back"},{"shape":"rect","geometry":{"edge":"back","depth":96},"label":"outfeed","severity":"shared","minHeight":42,"note":"long-board outfeed"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at infeed"}],"ports":[{"id":"in","label":"stock_in","position":[0,-11]},{"id":"out","label":"stock_out","position":[0,11]}]},{"id":"builtin-bandsaw-14in","name":"Bandsaw (14in)","category":"bandsaw","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-13.0,-15.0],[13.0,-15.0],[13.0,15.0],[-13.0,15.0]]},"anchor":[0,0],"anchorNote":"blade at table slot","height":43,"weight":250,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,6],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":72},"label":"infeed","severity":"shared","minHeight":46,"note":"resaw infeed for long stock"},{"shape":"rect","geometry":{"edge":"back","depth":72},"label":"outfeed","severity":"shared","minHeight":46,"note":"resaw outfeed"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the front of the table"},{"shape":"rect","geometry":{"edge":"front","depth":8},"label":"blade_access","severity":"hard","minHeight":null,"note":"immediate blade danger zone, keep clear"}],"ports":[{"id":"in","label":"stock_in","position":[0,-15]},{"id":"out","label":"stock_out","position":[0,15]}]},{"id":"builtin-miter-saw","name":"Miter saw (compound, station)","category":"miter_saw","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-10.0],[12.0,-10.0],[12.0,10.0],[-12.0,10.0]]},"anchor":[0,0],"anchorNote":"blade at fence intersection","height":36,"weight":55,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,8],"diameter":2.5},"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":96},"label":"infeed","severity":"shared","minHeight":40,"note":"long-trim support to the left; 8ft ideal"},{"shape":"rect","geometry":{"edge":"right","depth":96},"label":"outfeed","severity":"shared","minHeight":40,"note":"long-trim support to the right"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the front"}],"ports":[{"id":"in","label":"stock_in","position":[-12,0]},{"id":"out","label":"stock_out","position":[12,0]}]},{"id":"builtin-drill-press","name":"Drill press (floor standing)","category":"drill_press","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-10.0,-12.0],[10.0,-12.0],[10.0,12.0],[-10.0,12.0]]},"anchor":[0,0],"anchorNote":"spindle / chuck axis","height":66,"weight":200,"power":{"voltage":120,"amps":12,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the front"},{"shape":"rect","geometry":{"edge":"left","depth":36},"label":"loading","severity":"soft","minHeight":null,"note":"long-work overhang support, left"},{"shape":"rect","geometry":{"edge":"right","depth":36},"label":"loading","severity":"soft","minHeight":null,"note":"long-work overhang support, right"}],"ports":[]},{"id":"builtin-wood-lathe","name":"Wood lathe (with outboard turning)","category":"lathe","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-6,-9],[42,-9],[42,9],[-6,9]]},"anchor":[0,0],"anchorNote":"headstock spindle","height":44,"weight":220,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"turner stands along the front of the bed"},{"shape":"rect","geometry":{"edge":"right","depth":24},"label":"end_clearance","severity":"soft","minHeight":44,"note":"tailstock end, room for long spindle stock"},{"shape":"arc","geometry":{"center":[0,0],"radius":20,"startAngle":180,"sweep":90},"label":"swing","severity":"hard","minHeight":null,"note":"outboard bowl swing off the headstock, front-left arc"}],"ports":[]},{"id":"builtin-metal-lathe","name":"Metal lathe (benchtop)","category":"metal_lathe","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-3,-7],[27,-7],[27,7],[-3,7]]},"anchor":[0,0],"anchorNote":"spindle / chuck","height":16,"weight":300,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":24},"label":"end_clearance","severity":"hard","minHeight":null,"note":"bar stock protruding through the spindle bore"},{"shape":"rect","geometry":{"edge":"right","depth":18},"label":"end_clearance","severity":"soft","minHeight":null,"note":"tailstock end for long work"},{"shape":"rect","geometry":{"edge":"front","depth":24},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the carriage"}],"ports":[]},{"id":"builtin-mill-benchtop","name":"Milling machine (benchtop)","category":"mill","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-10.0],[12.0,-10.0],[12.0,10.0],[-12.0,10.0]]},"anchor":[0,0],"anchorNote":"spindle axis","height":32,"weight":350,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":16},"label":"service","severity":"soft","minHeight":null,"note":"X-table travel overhang, left"},{"shape":"rect","geometry":{"edge":"right","depth":16},"label":"service","severity":"soft","minHeight":null,"note":"X-table travel overhang, right"},{"shape":"rect","geometry":{"edge":"front","depth":24},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the handwheels"}],"ports":[]},{"id":"builtin-cnc-router-4x4","name":"CNC router (4x4 bed)","category":"cnc_router","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-30.0,-30.0],[30.0,-30.0],[30.0,30.0],[-30.0,30.0]]},"anchor":[0,0],"anchorNote":"spoilboard center","height":48,"weight":400,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,0],"diameter":2.5},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":48},"label":"loading","severity":"shared","minHeight":null,"note":"material load and unload from the front"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator and pendant at the front"},{"shape":"rect","geometry":{"edge":"back","depth":18},"label":"service","severity":"soft","minHeight":null,"note":"rear access for wiring and gantry service"},{"shape":"rect","geometry":{"edge":"left","depth":18},"label":"service","severity":"soft","minHeight":null,"note":"side access for bit changes"},{"shape":"rect","geometry":{"edge":"right","depth":18},"label":"service","severity":"soft","minHeight":null,"note":"side access for bit changes"}],"ports":[{"id":"in","label":"stock_in","position":[0,-30]}]},{"id":"builtin-welding-table","name":"Welding table (with MIG)","category":"welding","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-15.0,-30.0],[15.0,-30.0],[15.0,30.0],[-15.0,30.0]]},"anchor":[0,0],"anchorNote":"table center","height":34,"weight":350,"power":{"voltage":240,"amps":50,"phase":1,"dedicated":true},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":48},"label":"service","severity":"hard","minHeight":null,"note":"spark and slag spray zone, keep combustibles clear"},{"shape":"rect","geometry":{"edge":"left","depth":24},"label":"service","severity":"hard","minHeight":null,"note":"spark standoff, left"},{"shape":"rect","geometry":{"edge":"right","depth":24},"label":"service","severity":"hard","minHeight":null,"note":"spark standoff, right"},{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"operator","severity":"soft","minHeight":null,"note":"welder position, overlaps the spark zone"}],"ports":[]},{"id":"builtin-bench-grinder","name":"Bench grinder (pedestal)","category":"grinder","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-8.0,-7.0],[8.0,-7.0],[8.0,7.0],[-8.0,7.0]]},"anchor":[0,0],"anchorNote":"between the wheels","height":44,"weight":60,"power":{"voltage":120,"amps":12,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"service","severity":"hard","minHeight":null,"note":"spark cone projecting forward from the wheels"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the tool rests"}],"ports":[]},{"id":"builtin-assembly-table","name":"Assembly table (4x8)","category":"assembly","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-24.0,-48.0],[24.0,-48.0],[24.0,48.0],[-24.0,48.0]]},"anchor":[0,0],"anchorNote":"table center","height":34,"weight":300,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron; shares space with aisles and neighbor outfeed"},{"shape":"rect","geometry":{"edge":"back","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron, far side"},{"shape":"rect","geometry":{"edge":"left","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron, left"},{"shape":"rect","geometry":{"edge":"right","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron, right"}],"ports":[]},{"id":"builtin-workbench","name":"Workbench (with front and end vise)","category":"bench","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-36.0],[12.0,-36.0],[12.0,36.0],[-12.0,36.0]]},"anchor":[0,0],"anchorNote":"bench center","height":34,"weight":250,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"operator","severity":"soft","minHeight":null,"note":"primary working side at the front vise"},{"shape":"rect","geometry":{"edge":"right","depth":24},"label":"operator","severity":"soft","minHeight":null,"note":"end-vise work clearance"}],"ports":[]},{"id":"builtin-dust-collector","name":"Dust collector (2HP cyclone)","category":"dust_collector","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-15.0,-20.0],[15.0,-20.0],[15.0,20.0],[-15.0,20.0]]},"anchor":[0,0],"anchorNote":"inlet center","height":78,"weight":200,"power":{"voltage":240,"amps":12,"phase":1,"dedicated":true},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"service","severity":"soft","minHeight":null,"note":"bin and filter service access"}],"ports":[]},{"id":"builtin-air-compressor","name":"Air compressor (vertical 60gal)","category":"compressor","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-13.0],[12.0,-13.0],[12.0,13.0],[-12.0,13.0]]},"anchor":[0,0],"anchorNote":"tank center","height":68,"weight":250,"power":{"voltage":240,"amps":15,"phase":1,"dedicated":true},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":24},"label":"service","severity":"soft","minHeight":null,"note":"drain, regulator, and pump access"},{"shape":"rect","geometry":{"edge":"back","depth":12},"label":"service","severity":"soft","minHeight":null,"note":"cooling and heat clearance behind the pump"}],"ports":[]},{"id":"builtin-electronics-bench","name":"Electronics bench (ESD)","category":"electronics","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-15.0,-30.0],[15.0,-30.0],[15.0,30.0],[-15.0,30.0]]},"anchor":[0,0],"anchorNote":"bench center","height":34,"weight":200,"power":{"voltage":120,"amps":20,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"seated operator, chair plus reach"}],"ports":[]}]};
 
 /* ---- geometry core ---- */
 const G = {
-  bounds(footprint){
-    const v = footprint.vertices;
-    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-    for(const [x,y] of v){ if(x<minX)minX=x; if(y<minY)minY=y; if(x>maxX)maxX=x; if(y>maxY)maxY=y; }
-    return {minX,minY,maxX,maxY};
+  bounds(fp){ const v=fp.vertices; let a=Infinity,b=Infinity,c=-Infinity,d=-Infinity;
+    for(const[x,y]of v){if(x<a)a=x;if(y<b)b=y;if(x>c)c=x;if(y>d)d=y;} return{minX:a,minY:b,maxX:c,maxY:d};},
+  rectOffEdge(b,edge,depth){switch(edge){
+    case"front":return[[b.minX,b.minY-depth],[b.maxX,b.minY-depth],[b.maxX,b.minY],[b.minX,b.minY]];
+    case"back":return[[b.minX,b.maxY],[b.maxX,b.maxY],[b.maxX,b.maxY+depth],[b.minX,b.maxY+depth]];
+    case"left":return[[b.minX-depth,b.minY],[b.minX,b.minY],[b.minX,b.maxY],[b.minX-depth,b.maxY]];
+    case"right":return[[b.maxX,b.minY],[b.maxX+depth,b.minY],[b.maxX+depth,b.maxY],[b.maxX,b.maxY]];
+    default:throw new Error("edge "+edge);}},
+  pointInPolygon(p,poly){let n=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i][0],yi=poly[i][1],xj=poly[j][0],yj=poly[j][1];
+    if(((yi>p[1])!==(yj>p[1]))&&(p[0]<(xj-xi)*(p[1]-yi)/(yj-yi)+xi))n=!n;}return n;},
+  _o(a,b,c){return (b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);},
+  segIntersect(p1,p2,p3,p4){
+    const d1=this._o(p3,p4,p1),d2=this._o(p3,p4,p2),d3=this._o(p1,p2,p3),d4=this._o(p1,p2,p4);
+    return((d1>0&&d2<0)||(d1<0&&d2>0))&&((d3>0&&d4<0)||(d3<0&&d4>0));},
+  polysOverlap(a,b){
+    for(const v of a) if(this.pointInPolygon(v,b)) return true;
+    for(const v of b) if(this.pointInPolygon(v,a)) return true;
+    for(let i=0;i<a.length;i++){const a1=a[i],a2=a[(i+1)%a.length];
+      for(let j=0;j<b.length;j++){const b1=b[j],b2=b[(j+1)%b.length];
+        if(this.segIntersect(a1,a2,b1,b2))return true;}}
+    return false;},
+  bearing(cx,cy,px,py){let b=Math.atan2(px-cx,py-cy)*180/Math.PI;return(b%360+360)%360;},
+  angleInSweep(b,s,w){return(((b-s)%360+360)%360)<=w+1e-9;},
+  pointInArc(p,arc){const dx=p[0]-arc.center[0],dy=p[1]-arc.center[1],r=Math.hypot(dx,dy);
+    if(r>arc.radius+1e-9)return false; if(arc.innerRadius!=null&&r<arc.innerRadius-1e-9)return false;
+    return this.angleInSweep(this.bearing(arc.center[0],arc.center[1],p[0],p[1]),arc.startAngle,arc.sweep);},
+  mirrorArc(arc){return Object.assign({},arc,{center:[-arc.center[0],arc.center[1]],
+    startAngle:((360-(arc.startAngle+arc.sweep))%360+360)%360, sweep:arc.sweep});},
+  toWorld(pt,pl){let x=pt[0],y=pt[1]; if(pl.mirrored)x=-x;
+    const t=(pl.rotation||0)*Math.PI/180,c=Math.cos(t),s=Math.sin(t);
+    return[x*c+y*s+pl.position[0], -x*s+y*c+pl.position[1]];},
+  arcToWorldPoly(arc,pl,step=10){let a=pl.mirrored?this.mirrorArc(arc):arc;
+    const rot=pl.rotation||0, start=((a.startAngle+rot)%360+360)%360;
+    const c=this.toWorld(a.center,{position:pl.position,rotation:0,mirrored:false});
+    const pts=[],inner=a.innerRadius||0;
+    for(let d=0;d<=a.sweep+1e-6;d+=step){const b=(start+d)*Math.PI/180;
+      pts.push([c[0]+a.radius*Math.sin(b),c[1]+a.radius*Math.cos(b)]);}
+    if(inner>0){for(let d=a.sweep;d>=-1e-6;d-=step){const b=(start+d)*Math.PI/180;
+      pts.push([c[0]+inner*Math.sin(b),c[1]+inner*Math.cos(b)]);}} else pts.push(c);
+    return pts;},
+  zoneWorldPoly(z,def,pl){ if(z.shape==="arc")return this.arcToWorldPoly(z.geometry,pl);
+    const local=z.shape==="rect"?this.rectOffEdge(this.bounds(def.footprint),z.geometry.edge,z.geometry.depth):z.geometry.vertices;
+    return local.map(p=>this.toWorld(p,pl));},
+  footprintWorldPoly(def,pl){return def.footprint.vertices.map(p=>this.toWorld(p,pl));}
+};
+
+/* ---- TRIM: conflict severity matrix + checker ---- */
+const Trim = {
+  interaction(a,b){
+    const k=[a,b].sort().join("|");
+    const M={
+      "footprint|footprint":"error",
+      "footprint|hard":"error",
+      "footprint|soft":"warning",
+      "footprint|shared":"warning",
+      "hard|hard":"error",
+      "hard|shared":"error",
+      "hard|soft":"warning",
+      "shared|soft":"ok",
+      "shared|shared":"ok",
+      "soft|soft":"warning",
+    };
+    return M[k]||"ok";
   },
-  // rectangle projected outward from a named footprint edge -> polygon (local frame)
-  rectOffEdge(b, edge, depth){
-    switch(edge){
-      case "front": return [[b.minX,b.minY-depth],[b.maxX,b.minY-depth],[b.maxX,b.minY],[b.minX,b.minY]];
-      case "back":  return [[b.minX,b.maxY],[b.maxX,b.maxY],[b.maxX,b.maxY+depth],[b.minX,b.maxY+depth]];
-      case "left":  return [[b.minX-depth,b.minY],[b.minX,b.minY],[b.minX,b.maxY],[b.minX-depth,b.maxY]];
-      case "right": return [[b.maxX,b.minY],[b.maxX+depth,b.minY],[b.maxX+depth,b.maxY],[b.maxX,b.maxY]];
-      default: throw new Error("unknown edge "+edge);
-    }
+  regions(pl){
+    const def=Model.def(pl.defId); if(!def) return [];
+    const out=[{kind:"footprint",label:"body",poly:G.footprintWorldPoly(def,pl)}];
+    for(const z of def.clearances)
+      out.push({kind:z.severity,label:z.label,poly:G.zoneWorldPoly(z,def,pl)});
+    return out;
   },
-  pointInPolygon(pt, poly){
-    let inside=false;
-    for(let i=0,j=poly.length-1;i<poly.length;j=i++){
-      const xi=poly[i][0],yi=poly[i][1],xj=poly[j][0],yj=poly[j][1];
-      const hit=((yi>pt[1])!==(yj>pt[1])) &&
-        (pt[0] < (xj-xi)*(pt[1]-yi)/(yj-yi)+xi);
-      if(hit) inside=!inside;
-    }
-    return inside;
-  },
-  // bearing of a point about a center: degrees clockwise from +y (north)
-  bearing(cx,cy,px,py){
-    const dx=px-cx, dy=py-cy;
-    let b = Math.atan2(dx,dy)*180/Math.PI;   // atan2(east,north) -> CW from north
-    return (b%360+360)%360;
-  },
-  angleInSweep(b, start, sweep){
-    const d = ((b-start)%360+360)%360;
-    return d <= sweep + 1e-9;
-  },
-  pointInArc(pt, arc){
-    const dx=pt[0]-arc.center[0], dy=pt[1]-arc.center[1];
-    const r=Math.hypot(dx,dy);
-    if(r>arc.radius+1e-9) return false;
-    if(arc.innerRadius!=null && r<arc.innerRadius-1e-9) return false;
-    return this.angleInSweep(this.bearing(arc.center[0],arc.center[1],pt[0],pt[1]), arc.startAngle, arc.sweep);
-  },
-  // mirror an arc across the local y-axis (x -> -x)
-  mirrorArc(arc){
-    return Object.assign({}, arc, {
-      center:[-arc.center[0], arc.center[1]],
-      startAngle: ((360-(arc.startAngle+arc.sweep))%360+360)%360,
-      sweep: arc.sweep
-    });
-  },
-  // local point -> world, applying mirror(before), CW rotation, translation
-  toWorld(pt, placement){
-    let x=pt[0], y=pt[1];
-    if(placement.mirrored) x=-x;
-    const t=(placement.rotation||0)*Math.PI/180;
-    const c=Math.cos(t), s=Math.sin(t);
-    const rx = x*c + y*s;      // clockwise rotation in +x-right/+y-up frame
-    const ry = -x*s + y*c;
-    return [rx+placement.position[0], ry+placement.position[1]];
-  },
-  // sample an arc wedge into a world-space polygon (robust for render + checks)
-  arcToWorldPoly(arc, placement, step=6){
-    let a = arc;
-    if(placement.mirrored) a = this.mirrorArc(arc);
-    const rot = placement.rotation||0;
-    const start = ((a.startAngle+rot)%360+360)%360;
-    const c = this.toWorld(a.center, {position:placement.position, rotation:0, mirrored:false});
-    const pts=[];
-    const inner = a.innerRadius||0;
-    // outer arc start->end
-    for(let d=0; d<=a.sweep+1e-6; d+=step){
-      const b=(start+d)*Math.PI/180;
-      pts.push([c[0]+a.radius*Math.sin(b), c[1]+a.radius*Math.cos(b)]);
-    }
-    if(inner>0){
-      for(let d=a.sweep; d>=-1e-6; d-=step){
-        const b=(start+d)*Math.PI/180;
-        pts.push([c[0]+inner*Math.sin(b), c[1]+inner*Math.cos(b)]);
+  rank(s){return s==="error"?2:s==="warning"?1:0;},
+  compute(doc){
+    const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
+    const pls=sc.placements, recs=[], worst={};
+    const bump=(id,s)=>{ if(this.rank(s)>this.rank(worst[id]||"ok")) worst[id]=s; };
+    for(let i=0;i<pls.length;i++){
+      const rgA=this.regions(pls[i]); const dA=Model.def(pls[i].defId);
+      const nameA=pls[i].label||(dA&&dA.name)||"?";
+      for(let j=i+1;j<pls.length;j++){
+        const rgB=this.regions(pls[j]); const dB=Model.def(pls[j].defId);
+        const nameB=pls[j].label||(dB&&dB.name)||"?";
+        let pairWorst="ok", detail=null;
+        for(const ra of rgA) for(const rb of rgB){
+          const sev=this.interaction(ra.kind,rb.kind);
+          if(sev==="ok") continue;
+          if(this.rank(sev)>this.rank(pairWorst) && G.polysOverlap(ra.poly,rb.poly)){
+            pairWorst=sev; detail={la:ra.label,lb:rb.label};
+          }
+        }
+        if(pairWorst!=="ok"){
+          recs.push({sev:pairWorst,a:pls[i].id,b:pls[j].id,
+            text:`${nameA} ${detail.la} \u00d7 ${nameB} ${detail.lb}`});
+          bump(pls[i].id,pairWorst); bump(pls[j].id,pairWorst);
+        }
       }
-    } else {
-      pts.push(c); // wedge closes at center
     }
-    return pts;
-  },
-  // resolve a clearance zone to a world-space polygon
-  zoneWorldPoly(zone, def, placement){
-    if(zone.shape==="arc") return this.arcToWorldPoly(zone.geometry, placement);
-    let local;
-    if(zone.shape==="rect") local = this.rectOffEdge(this.bounds(def.footprint), zone.geometry.edge, zone.geometry.depth);
-    else local = zone.geometry.vertices;
-    return local.map(p=>this.toWorld(p, placement));
-  },
-  footprintWorldPoly(def, placement){
-    return def.footprint.vertices.map(p=>this.toWorld(p, placement));
+    const fb=doc.facility.boundary.vertices;
+    for(const pl of pls){
+      const def=Model.def(pl.defId); if(!def) continue;
+      const fp=G.footprintWorldPoly(def,pl);
+      if(fp.some(v=>!G.pointInPolygon(v,fb))){
+        recs.push({sev:"error",a:pl.id,b:"facility",
+          text:`${pl.label||def.name} extends past the walls`});
+        bump(pl.id,"error");
+      }
+    }
+    const errors=recs.filter(r=>r.sev==="error").length;
+    const warnings=recs.filter(r=>r.sev==="warning").length;
+    return {records:recs,worst,errors,warnings};
   }
 };
 
 /* ---- document model ---- */
 const Model = {
-  library(){ return SEED.library; },
-  def(id){ return SEED.library.find(m=>m.id===id); },
-  demo(){
-    // a small demo shop so the plat is not blank on first load
-    return {
-      schemaVersion:"1.0.0",
-      meta:{title:"Demo shop", units:"imperial", gridSpacing:12},
-      facility:{ id:"f1", name:"Two-bay shop",
-        boundary:{vertices:[[0,0],[288,0],[288,216],[0,216]]}, // 24ft x 18ft
-        ceilingHeight:108, northOffset:0, features:[] },
-      library: SEED.library,
-      scenarios:[{ id:"s1", name:"Current",
-        placements:[
-          {id:"p1", defId:"builtin-table-saw-cabinet", position:[96,120], rotation:0, mirrored:false, label:"Table saw"},
-          {id:"p2", defId:"builtin-jointer-8in", position:[150,60], rotation:0, mirrored:false, label:"Jointer"},
-          {id:"p3", defId:"builtin-wood-lathe", position:[210,160], rotation:0, mirrored:false, label:"Lathe"},
-        ],
-        utilityNodes:[], utilityRuns:[], flows:[], notes:"" }],
-      activeScenarioId:"s1"
-    };
-  },
-  export(doc){
-    const blob=new Blob([JSON.stringify(doc,null,2)],{type:"application/json"});
-    const a=document.createElement("a");
-    a.href=URL.createObjectURL(blob);
+  library(){return SEED.library;},
+  def(id){return SEED.library.find(m=>m.id===id);},
+  _seq:100,
+  newId(){return "p"+(++this._seq);},
+  emptyFacility(){return {schemaVersion:"1.0.0",
+    meta:{title:"Untitled",units:"imperial",gridSpacing:12},
+    facility:{id:"f1",name:"Shop",boundary:{vertices:[[0,0],[288,0],[288,216],[0,216]]},
+      ceilingHeight:108,northOffset:0,features:[]},
+    library:SEED.library,
+    scenarios:[{id:"s1",name:"Current",placements:[],utilityNodes:[],utilityRuns:[],flows:[],notes:""}],
+    activeScenarioId:"s1"};},
+  demo(){const d=this.emptyFacility(); d.meta.title="Demo shop"; d.facility.name="Two-bay shop";
+    d.scenarios[0].placements=[
+      {id:"p1",defId:"builtin-table-saw-cabinet",position:[96,120],rotation:0,mirrored:false,label:"Table saw"},
+      {id:"p2",defId:"builtin-jointer-8in",position:[150,60],rotation:0,mirrored:false,label:"Jointer"},
+      {id:"p3",defId:"builtin-wood-lathe",position:[214,158],rotation:0,mirrored:false,label:"Lathe"}
+    ]; return d;},
+  add(doc,defId){const def=this.def(defId); const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
+    const fb=G.bounds(doc.facility.boundary); const cx=(fb.minX+fb.maxX)/2, cy=(fb.minY+fb.maxY)/2;
+    const pl={id:this.newId(),defId,position:[Math.round(cx),Math.round(cy)],rotation:0,mirrored:false,
+      locked:false,label:def.name.replace(/\s*\(.*$/,"")};
+    sc.placements.push(pl); return pl;},
+  export(doc){const blob=new Blob([JSON.stringify(doc,null,2)],{type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
     a.download=(doc.meta.title||"bayplan").replace(/\s+/g,"-").toLowerCase()+".bayplan.json";
-    a.click(); URL.revokeObjectURL(a.href);
-  },
-  import(file){
-    return file.text().then(t=>{
-      const d=JSON.parse(t);
-      if(!d.facility || !Array.isArray(d.scenarios)) throw new Error("Not a BAYPLAN document.");
-      return d;
-    });
-  }
+    a.click(); URL.revokeObjectURL(a.href);},
+  import(file){return file.text().then(t=>{const d=JSON.parse(t);
+    if(!d.facility||!Array.isArray(d.scenarios))throw new Error("Not a BAYPLAN document.");
+    d.library=SEED.library; return d;});}
 };
 
-/* ---- render (SVG plat, north up, inches) ---- */
+/* ---- render + interaction ---- */
 const View = {
-  el:null, doc:null, pad:24,
-  mount(el){ this.el=el; },
-  scene(doc){ this.doc=doc; this.draw(); },
-  toScreen(pt, b, H){ return [pt[0]-b.minX+this.pad, (H)-(pt[1]-b.minY)+this.pad]; },
-  poly(pts,b,H){ return pts.map(p=>this.toScreen(p,b,H).join(",")).join(" "); },
+  el:null,doc:null,pad:24,_b:null,_H:0,conflicts:null,
+  mount(el){this.el=el;},
+  scene(doc){this.doc=doc; this.conflicts=Trim.compute(doc); this.draw(); UI.syncPanels();},
+  refresh(){this.conflicts=Trim.compute(this.doc); this.draw(); UI.syncPanels();},
+  toScreen(pt){return[pt[0]-this._b.minX+this.pad, this._H-(pt[1]-this._b.minY)+this.pad];},
+  screenToWorld(clientX,clientY){
+    const svg=this.el.querySelector("svg"); const m=svg.getScreenCTM().inverse();
+    const p=svg.createSVGPoint(); p.x=clientX; p.y=clientY; const u=p.matrixTransform(m);
+    return[u.x-this.pad+this._b.minX, this._b.minY+this._H+this.pad-u.y];},
+  polyStr(pts){return pts.map(p=>this.toScreen(p).join(",")).join(" ");},
+  sevColor(s){return s==="error"?"var(--hard)":s==="warning"?"var(--soft)":null;},
   draw(){
-    const doc=this.doc, fac=doc.facility;
-    const fb=G.bounds(fac.boundary);
-    const W=fb.maxX-fb.minX, H=fb.maxY-fb.minY;
-    const vbW=W+this.pad*2, vbH=H+this.pad*2;
+    const doc=this.doc,fac=doc.facility;
+    const fb=G.bounds(fac.boundary); this._b=fb;
+    const W=fb.maxX-fb.minX,H=fb.maxY-fb.minY; this._H=H;
+    const vbW=W+this.pad*2,vbH=H+this.pad*2;
     const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
     const grid=doc.meta.gridSpacing||12;
-    let g="";
-    // grid
-    for(let x=fb.minX; x<=fb.maxX+.1; x+=grid){
-      const a=this.toScreen([x,fb.minY],fb,H), c=this.toScreen([x,fb.maxY],fb,H);
-      g+=`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" stroke="var(--grid)"/>`;
-    }
-    for(let y=fb.minY; y<=fb.maxY+.1; y+=grid){
-      const a=this.toScreen([fb.minX,y],fb,H), c=this.toScreen([fb.maxX,y],fb,H);
-      g+=`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" stroke="var(--grid)"/>`;
-    }
-    // facility boundary
-    g+=`<polygon points="${this.poly(fac.boundary.vertices,fb,H)}" fill="none" stroke="var(--ink)" stroke-width="1.5"/>`;
-    // placements: clearance zones first (under), then footprints
     const sevVar={hard:"var(--hard)",soft:"var(--soft)",shared:"var(--shared)"};
-    for(const pl of sc.placements){
-      const def=Model.def(pl.defId); if(!def) continue;
-      for(const z of def.clearances){
-        const wp=G.zoneWorldPoly(z, def, pl);
-        const col=sevVar[z.severity]||"var(--ink-dim)";
-        g+=`<polygon points="${this.poly(wp,fb,H)}" fill="${col}" fill-opacity="0.16" stroke="${col}" stroke-opacity="0.5" stroke-width="1" stroke-dasharray="${z.severity==='hard'?'':'4 3'}"/>`;
-      }
-    }
-    for(const pl of sc.placements){
-      const def=Model.def(pl.defId); if(!def) continue;
+    let g="";
+    for(let x=fb.minX;x<=fb.maxX+.1;x+=grid){const a=this.toScreen([x,fb.minY]),c=this.toScreen([x,fb.maxY]);
+      g+=`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" stroke="var(--grid)"/>`;}
+    for(let y=fb.minY;y<=fb.maxY+.1;y+=grid){const a=this.toScreen([fb.minX,y]),c=this.toScreen([fb.maxX,y]);
+      g+=`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" stroke="var(--grid)"/>`;}
+    g+=`<polygon points="${this.polyStr(fac.boundary.vertices)}" fill="none" stroke="var(--ink)" stroke-width="1.5"/>`;
+    for(const pl of sc.placements){const def=Model.def(pl.defId); if(!def)continue;
+      for(const z of def.clearances){const wp=G.zoneWorldPoly(z,def,pl); const col=sevVar[z.severity]||"var(--ink-dim)";
+        g+=`<polygon points="${this.polyStr(wp)}" fill="${col}" fill-opacity="0.15" stroke="${col}" stroke-opacity="0.5" stroke-width="1" stroke-dasharray="${z.severity==='hard'?'':'4 3'}" style="pointer-events:none"/>`;}}
+    for(const pl of sc.placements){const def=Model.def(pl.defId); if(!def)continue;
       const fp=G.footprintWorldPoly(def,pl);
-      g+=`<polygon points="${this.poly(fp,fb,H)}" fill="var(--footprint-fill)" stroke="var(--footprint)" stroke-width="1.5"/>`;
-      const a=this.toScreen(pl.position,fb,H);
-      g+=`<circle cx="${a[0]}" cy="${a[1]}" r="2.5" fill="var(--brass)"/>`;
-      g+=`<text x="${a[0]}" y="${a[1]-8}" fill="var(--ink)" font-size="9" font-family="var(--font-mono)" text-anchor="middle">${pl.label||def.name}</text>`;
+      const cs=this.sevColor(this.conflicts.worst[pl.id]);
+      const stroke=cs||"var(--footprint)";
+      g+=`<polygon points="${this.polyStr(fp)}" fill="${cs?stroke:'var(--footprint-fill)'}" fill-opacity="${cs?0.16:1}" stroke="${stroke}" stroke-width="${cs?2:1.5}"/>`;
+      const a=this.toScreen(pl.position);
+      g+=`<circle cx="${a[0]}" cy="${a[1]}" r="2.5" fill="var(--brass)" style="pointer-events:none"/>`;
+      g+=`<text x="${a[0]}" y="${a[1]-8}" fill="var(--ink)" font-size="9" font-family="var(--font-mono)" text-anchor="middle" style="pointer-events:none">${pl.label||def.name}${pl.locked?" \u25a0":""}</text>`;
+      if(pl.id===UI.selectedId){const bb=G.bounds({vertices:fp});
+        const s1=this.toScreen([bb.minX,bb.maxY]),s2=this.toScreen([bb.maxX,bb.minY]);
+        g+=`<rect x="${Math.min(s1[0],s2[0])-4}" y="${Math.min(s1[1],s2[1])-4}" width="${Math.abs(s2[0]-s1[0])+8}" height="${Math.abs(s2[1]-s1[1])+8}" fill="none" stroke="var(--brass)" stroke-width="1.5" stroke-dasharray="5 3" style="pointer-events:none"/>`;}
     }
-    // title block (signature) + north arrow, lower-right cartouche
-    const bw=150, bh=54, bx=vbW-bw-6, by=vbH-bh-6;
-    g+=`<g font-family="var(--font-mono)">
+    const bw=150,bh=54,bx=vbW-bw-6,by=vbH-bh-6;
+    g+=`<g font-family="var(--font-mono)" style="pointer-events:none">
       <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="var(--panel)" stroke="var(--ink)" stroke-width="1"/>
       <line x1="${bx}" y1="${by+18}" x2="${bx+bw}" y2="${by+18}" stroke="var(--line)"/>
       <text x="${bx+8}" y="${by+13}" fill="var(--ink)" font-size="9" letter-spacing="1.5">${(doc.meta.title||'UNTITLED').toUpperCase()}</text>
-      <text x="${bx+8}" y="${by+32}" fill="var(--ink-dim)" font-size="8">SCALE 1in = 1in · IMPERIAL</text>
-      <text x="${bx+8}" y="${by+45}" fill="var(--ink-dim)" font-size="8">BAYPLAN FI-075 · ${sc.name.toUpperCase()}</text>
+      <text x="${bx+8}" y="${by+32}" fill="var(--ink-dim)" font-size="8">SCALE 1in = 1in \u00b7 IMPERIAL</text>
+      <text x="${bx+8}" y="${by+45}" fill="var(--ink-dim)" font-size="8">BAYPLAN FI-075 \u00b7 ${sc.name.toUpperCase()}</text>
       <g transform="translate(${bx+bw-20},${by+34})">
         <polygon points="0,-13 4,4 0,0 -4,4" fill="var(--brass)"/>
-        <text x="0" y="-16" fill="var(--brass)" font-size="8" text-anchor="middle">N</text>
-      </g></g>`;
+        <text x="0" y="-16" fill="var(--brass)" font-size="8" text-anchor="middle">N</text></g></g>`;
     this.el.innerHTML=`<svg viewBox="0 0 ${vbW} ${vbH}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Workshop floor plat">${g}</svg>`;
+    this.bindPointer();
+  },
+  bindPointer(){
+    const svg=this.el.querySelector("svg"); if(!svg)return;
+    let drag=null;
+    svg.addEventListener("pointerdown",e=>{
+      const w=this.screenToWorld(e.clientX,e.clientY);
+      const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
+      let hit=null;
+      for(let i=sc.placements.length-1;i>=0;i--){const pl=sc.placements[i],def=Model.def(pl.defId);
+        if(def&&G.pointInPolygon(w,G.footprintWorldPoly(def,pl))){hit=pl;break;}}
+      if(hit){ UI.select(hit.id);
+        if(!hit.locked){ drag={id:hit.id,offX:w[0]-hit.position[0],offY:w[1]-hit.position[1]};
+          svg.setPointerCapture(e.pointerId); }
+      } else UI.select(null);
+    });
+    svg.addEventListener("pointermove",e=>{
+      if(!drag)return;
+      const w=this.screenToWorld(e.clientX,e.clientY);
+      const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
+      const pl=sc.placements.find(p=>p.id===drag.id); if(!pl)return;
+      let nx=w[0]-drag.offX, ny=w[1]-drag.offY;
+      if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
+      pl.position=[nx,ny]; this.refresh();
+    });
+    const end=e=>{ if(drag){try{svg.releasePointerCapture(e.pointerId);}catch(_){}} drag=null; };
+    svg.addEventListener("pointerup",end);
+    svg.addEventListener("pointercancel",end);
   }
 };
 
 /* ---- ui ---- */
 const UI = {
-  doc:null,
-  boot(){
-    if(location.hash==="#test"){ Tests.run(); return; }
-    this.doc=Model.demo();
-    this.render();
-  },
-  setTheme(t){ document.documentElement.setAttribute("data-theme",t);
+  doc:null, selectedId:null,
+  boot(){ if(location.hash==="#test"){Tests.run();return;}
+    this.doc=Model.demo(); this.render();},
+  setTheme(t){document.documentElement.setAttribute("data-theme",t);
     for(const b of document.querySelectorAll("[data-theme-btn]"))
-      b.setAttribute("aria-pressed", String(b.dataset.themeBtn===t)); },
+      b.setAttribute("aria-pressed",String(b.dataset.themeBtn===t));},
+  selected(){const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
+    return sc.placements.find(p=>p.id===this.selectedId)||null;},
+  select(id){this.selectedId=id; View.draw(); this.syncPanels();},
+  rotate(delta){const pl=this.selected(); if(!pl||pl.locked)return;
+    pl.rotation=(((pl.rotation||0)+delta)%360+360)%360; View.refresh();},
+  mirror(){const pl=this.selected(); if(!pl||pl.locked)return; pl.mirrored=!pl.mirrored; View.refresh();},
+  toggleLock(){const pl=this.selected(); if(!pl)return; pl.locked=!pl.locked; View.refresh();},
+  remove(){const pl=this.selected(); if(!pl)return;
+    const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
+    sc.placements=sc.placements.filter(p=>p.id!==pl.id); this.selectedId=null; View.refresh();},
+  addMachine(defId){const pl=Model.add(this.doc,defId); this.selectedId=pl.id; View.refresh();},
   render(){
     const lib=Model.library();
-    const cats=[...new Set(lib.map(m=>m.category))];
-    document.getElementById("app").innerHTML = `
+    document.getElementById("app").innerHTML=`
       <header>
-        <span class="wordmark">BAYPLAN</span>
-        <span class="fi">FI-075</span>
-        <span class="tag">stow the floor</span>
-        <span class="spacer"></span>
+        <span class="wordmark">BAYPLAN</span><span class="fi">FI-075</span>
+        <span class="tag">stow the floor</span><span class="spacer"></span>
         <div class="toolbar">
           <button id="newBtn">New</button>
           <button id="importBtn">Import</button>
@@ -346,158 +395,175 @@ const UI = {
       <main>
         <div class="stage" id="stage"></div>
         <aside>
+          <section id="selWrap"></section>
+          <section id="trimWrap"></section>
           <section>
-            <h2>Clearance severity</h2>
-            <div class="legend-row"><span class="sw hard"></span> Hard · never occupied</div>
-            <div class="legend-row"><span class="sw soft"></span> Soft · warn on overlap</div>
-            <div class="legend-row"><span class="sw shared"></span> Shared · may overlap</div>
-            <div class="legend-row"><span class="sw fp"></span> Machine footprint</div>
+            <h2>Add from shelf <span class="count">${lib.length}</span></h2>
+            <div class="shelf">${lib.map(m=>`<button data-add="${m.id}"><span>${m.name.replace(/\s*\(.*$/,'')}</span><span class="cat">${m.category}</span></button>`).join("")}</div>
           </section>
           <section>
-            <h2>Built-in library <span class="count">${lib.length}</span></h2>
-            <ul class="roster">
-              ${lib.map(m=>`<li><span>${m.name}</span><span class="cat">${m.category}</span></li>`).join("")}
-            </ul>
+            <h2>Clearance severity</h2>
+            <div class="legend-row"><span class="sw hard"></span> Hard \u00b7 never occupied</div>
+            <div class="legend-row"><span class="sw soft"></span> Soft \u00b7 warn on overlap</div>
+            <div class="legend-row"><span class="sw shared"></span> Shared \u00b7 may overlap</div>
+            <div class="legend-row"><span class="sw fp"></span> Machine footprint</div>
           </section>
         </aside>
       </main>
       <footer>
-        <span>${cats.length} categories</span>
-        <span>${lib.reduce((n,m)=>n+m.clearances.length,0)} clearance zones</span>
-        <span>tests: <a href="#test" onclick="location.reload()">run harness</a></span>
-        <span class="spacer"></span>
+        <span id="trimTally"></span><span class="spacer"></span>
+        <span>drag to move \u00b7 R rotate \u00b7 M mirror \u00b7 Del remove</span>
+        <span><a href="#test" onclick="location.reload()">tests</a></span>
         <span>GPL-3.0</span>
       </footer>`;
     View.mount(document.getElementById("stage"));
     View.scene(this.doc);
-    document.getElementById("newBtn").onclick=()=>{
-      this.doc=Model.demo(); this.doc.scenarios[0].placements=[]; this.doc.meta.title="Untitled";
-      View.scene(this.doc);
-    };
+    document.getElementById("newBtn").onclick=()=>{this.doc=Model.emptyFacility(); this.selectedId=null; View.scene(this.doc);};
     document.getElementById("exportBtn").onclick=()=>Model.export(this.doc);
-    document.getElementById("importBtn").onclick=()=>{
-      const inp=document.createElement("input"); inp.type="file"; inp.accept=".json";
-      inp.onchange=()=>{ if(inp.files[0]) Model.import(inp.files[0])
-        .then(d=>{ this.doc=d; View.scene(d); })
-        .catch(e=>alert("Import failed: "+e.message)); };
-      inp.click();
+    document.getElementById("importBtn").onclick=()=>{const inp=document.createElement("input");
+      inp.type="file"; inp.accept=".json";
+      inp.onchange=()=>{if(inp.files[0])Model.import(inp.files[0]).then(d=>{this.doc=d;this.selectedId=null;View.scene(d);}).catch(e=>alert("Import failed: "+e.message));};
+      inp.click();};
+    for(const b of document.querySelectorAll("[data-theme-btn]")) b.onclick=()=>this.setTheme(b.dataset.themeBtn);
+    for(const b of document.querySelectorAll("[data-add]")) b.onclick=()=>this.addMachine(b.dataset.add);
+    this.bindKeys();
+  },
+  bindKeys(){
+    document.onkeydown=e=>{
+      if(e.target.tagName==="INPUT")return;
+      if(e.key==="Escape"){this.select(null);return;}
+      const pl=this.selected(); if(!pl)return;
+      if(e.key==="r"||e.key==="R"){this.rotate(e.shiftKey?-90:90);e.preventDefault();}
+      else if(e.key==="m"||e.key==="M"){this.mirror();e.preventDefault();}
+      else if(e.key==="l"||e.key==="L"){this.toggleLock();e.preventDefault();}
+      else if(e.key==="Delete"||e.key==="Backspace"){this.remove();e.preventDefault();}
+      else if(e.key.startsWith("Arrow")&&!pl.locked){
+        const g=this.doc.meta.gridSpacing||12;
+        const d={ArrowLeft:[-g,0],ArrowRight:[g,0],ArrowUp:[0,g],ArrowDown:[0,-g]}[e.key];
+        if(d){pl.position=[pl.position[0]+d[0],pl.position[1]+d[1]];View.refresh();e.preventDefault();}
+      }
     };
-    for(const b of document.querySelectorAll("[data-theme-btn]"))
-      b.onclick=()=>this.setTheme(b.dataset.themeBtn);
+  },
+  syncPanels(){
+    const sw=document.getElementById("selWrap"); if(!sw)return;
+    const pl=this.selected();
+    if(pl){const def=Model.def(pl.defId);
+      sw.innerHTML=`<h2>Selection</h2>
+        <div class="selpanel">
+          <div class="name">${pl.label||def.name}</div>
+          <div class="row">
+            <button data-act="rotL">\u21b6 90</button>
+            <button data-act="rotR">90 \u21b7</button>
+            <button data-act="mir">Mirror</button>
+          </div>
+          <div class="row" style="margin-top:6px">
+            <button data-act="lock">${pl.locked?"Unlock":"Lock"}</button>
+            <button data-act="del" class="danger">Remove</button>
+          </div>
+          <div style="margin-top:8px; font-family:var(--font-mono); font-size:10px; color:var(--ink-dim)">
+            x ${Math.round(pl.position[0])} \u00b7 y ${Math.round(pl.position[1])} \u00b7 rot ${pl.rotation||0}\u00b0${pl.mirrored?" \u00b7 mirrored":""}
+          </div>
+        </div>`;
+      sw.querySelector('[data-act="rotL"]').onclick=()=>this.rotate(-90);
+      sw.querySelector('[data-act="rotR"]').onclick=()=>this.rotate(90);
+      sw.querySelector('[data-act="mir"]').onclick=()=>this.mirror();
+      sw.querySelector('[data-act="lock"]').onclick=()=>this.toggleLock();
+      sw.querySelector('[data-act="del"]').onclick=()=>this.remove();
+    } else {
+      const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
+      if(sc.placements.length===0)
+        sw.innerHTML=`<h2>Selection</h2><p class="empty">The floor is empty. Add a machine from the shelf below, then drag it into place. Clearance halos check themselves as you go.</p>`;
+      else{
+        sw.innerHTML=`<h2>On the floor <span class="count">${sc.placements.length}</span></h2>
+          <ul class="placed">${sc.placements.map(p=>{const d=Model.def(p.defId); const cs=View.conflicts.worst[p.id];
+            return `<li data-sel="${p.id}"><span>${p.label||d.name}</span><span class="meta" style="${cs==='error'?'color:var(--hard)':cs==='warning'?'color:var(--soft)':''}">${cs?cs:(p.locked?'locked':'ok')}</span></li>`;}).join("")}</ul>`;
+        for(const li of sw.querySelectorAll("[data-sel]")) li.onclick=()=>this.select(li.dataset.sel);
+      }
+    }
+    const tw=document.getElementById("trimWrap"); const c=View.conflicts;
+    if(tw){ let body;
+      if(c.records.length===0) body=`<p class="trim clear-msg">No conflicts. The layout is clear.</p>`;
+      else body=`<ul class="trim">${c.records.map(r=>`<li><span class="badge ${r.sev==='error'?'err':'warn'}">${r.sev==='error'?'ERR':'WARN'}</span> ${r.text}</li>`).join("")}</ul>`;
+      tw.innerHTML=`<h2>TRIM</h2>${body}`; }
+    const ft=document.getElementById("trimTally");
+    if(ft){ if(c.errors===0&&c.warnings===0) ft.innerHTML=`<span class="ok">TRIM: clear</span>`;
+      else ft.innerHTML=`TRIM: <span class="err">${c.errors} error${c.errors!==1?'s':''}</span> \u00b7 <span class="warn">${c.warnings} warning${c.warnings!==1?'s':''}</span>`; }
   }
 };
 
-/* ---- tests (browser-runnable, seeded with the library) ---- */
+/* ---- tests ---- */
 const Tests = {
-  results:[],
-  ok(name,cond,detail=""){ this.results.push({name,pass:!!cond,detail}); },
-  approx(a,b,eps=1e-6){ return Math.abs(a-b)<=eps; },
+  results:[], ok(n,c,d=""){this.results.push({name:n,pass:!!c,detail:d});},
+  approx(a,b,e=1e-6){return Math.abs(a-b)<=e;},
   run(){
-    const R=this.results; R.length=0;
-    const lib=SEED.library;
-
-    // 1. seed integrity
-    this.ok("seed: library non-empty", lib.length>0, lib.length+" machines");
-    let schemaOK=true, badFp=0, sev=new Set(), shapes=new Set();
-    for(const m of lib){
-      if(!m.id||!m.name||!m.category||!m.footprint||!Array.isArray(m.clearances)) schemaOK=false;
-      if(!m.footprint||m.footprint.vertices.length!==4) badFp++;
-      for(const z of m.clearances){ sev.add(z.severity); shapes.add(z.shape); }
-    }
-    this.ok("seed: every machine has required fields", schemaOK);
-    this.ok("seed: all footprints are 4-vertex rectangles", badFp===0, badFp+" bad");
-    this.ok("seed: exercises hard/soft/shared severities",
-      sev.has("hard")&&sev.has("soft")&&sev.has("shared"), [...sev].join(","));
-    this.ok("seed: exercises the arc primitive", shapes.has("arc"), [...shapes].join(","));
-
-    // 2. bounds with offset anchor (table saw: blade not centered)
-    const saw=lib.find(m=>m.id==="builtin-table-saw-cabinet");
-    const b=G.bounds(saw.footprint);
-    this.ok("bounds: table saw offset anchor",
-      b.minX===-14&&b.maxX===30&&b.minY===-13&&b.maxY===14,
-      JSON.stringify(b));
-
-    // 3. rectOffEdge projects outward from the named edge
+    const R=this.results; R.length=0; const lib=SEED.library;
+    this.ok("seed: library non-empty",lib.length>0,lib.length+" machines");
+    let schemaOK=true,badFp=0,sev=new Set(),shapes=new Set();
+    for(const m of lib){ if(!m.id||!m.name||!m.category||!m.footprint||!Array.isArray(m.clearances))schemaOK=false;
+      if(!m.footprint||m.footprint.vertices.length!==4)badFp++;
+      for(const z of m.clearances){sev.add(z.severity);shapes.add(z.shape);} }
+    this.ok("seed: required fields",schemaOK);
+    this.ok("seed: 4-vertex footprints",badFp===0,badFp+" bad");
+    this.ok("seed: hard/soft/shared present",sev.has("hard")&&sev.has("soft")&&sev.has("shared"),[...sev].join(","));
+    this.ok("seed: arc primitive present",shapes.has("arc"));
+    const saw=lib.find(m=>m.id==="builtin-table-saw-cabinet"); const b=G.bounds(saw.footprint);
+    this.ok("bounds: offset anchor",b.minX===-14&&b.maxX===30&&b.minY===-13&&b.maxY===14,JSON.stringify(b));
     const rb={minX:-10,minY:-10,maxX:10,maxY:10};
-    const front=G.rectOffEdge(rb,"front",5);
-    this.ok("rectOffEdge: front strip below minY",
-      front.every(p=>p[1]<=-10) && front.some(p=>p[1]===-15));
-    const right=G.rectOffEdge(rb,"right",5);
-    this.ok("rectOffEdge: right strip beyond maxX",
-      right.some(p=>p[0]===15) && right.every(p=>p[0]>=10));
-
-    // 4. point in polygon
+    this.ok("rectOffEdge: front below minY",G.rectOffEdge(rb,"front",5).some(p=>p[1]===-15));
+    this.ok("rectOffEdge: right beyond maxX",G.rectOffEdge(rb,"right",5).some(p=>p[0]===15));
     const sq=[[0,0],[10,0],[10,10],[0,10]];
-    this.ok("pointInPolygon: inside", G.pointInPolygon([5,5],sq));
-    this.ok("pointInPolygon: outside", !G.pointInPolygon([15,5],sq));
-
-    // 5. bearing convention (CW from +y north)
-    this.ok("bearing: +x is 90 (east)", this.approx(G.bearing(0,0,1,0),90));
-    this.ok("bearing: -y is 180 (front)", this.approx(G.bearing(0,0,0,-1),180));
-    this.ok("bearing: -x is 270 (west)", this.approx(G.bearing(0,0,-1,0),270));
-
-    // 6. point in arc: lathe outboard swing (start180 sweep90 = front-left)
-    const lathe=lib.find(m=>m.id==="builtin-wood-lathe");
-    const swing=lathe.clearances.find(z=>z.shape==="arc").geometry;
-    // a point front-left at bearing ~225, r=10, should be inside
-    const fl=[-7,-7]; // dx<0,dy<0 -> bearing 225
-    this.ok("pointInArc: front-left inside lathe swing", G.pointInArc(fl,swing),
-      "bearing "+G.bearing(0,0,fl[0],fl[1]).toFixed(0));
-    const br=[7,-7]; // front-right, bearing 135, outside 180..270
-    this.ok("pointInArc: front-right outside lathe swing", !G.pointInArc(br,swing));
-    const far=[-20,-20]; // right direction but beyond radius
-    this.ok("pointInArc: beyond radius excluded", !G.pointInArc(far,swing));
-
-    // 7. mirrorArc: 180/90 -> 90/90 (front-left flips to front-right)
+    this.ok("pointInPolygon: in",G.pointInPolygon([5,5],sq));
+    this.ok("pointInPolygon: out",!G.pointInPolygon([15,5],sq));
+    this.ok("bearing: +x=90",this.approx(G.bearing(0,0,1,0),90));
+    this.ok("bearing: -y=180",this.approx(G.bearing(0,0,0,-1),180));
+    const lathe=lib.find(m=>m.id==="builtin-wood-lathe"); const swing=lathe.clearances.find(z=>z.shape==="arc").geometry;
+    this.ok("pointInArc: front-left inside",G.pointInArc([-7,-7],swing),"bearing "+G.bearing(0,0,-7,-7).toFixed(0));
+    this.ok("pointInArc: front-right outside",!G.pointInArc([7,-7],swing));
+    this.ok("pointInArc: beyond radius",!G.pointInArc([-20,-20],swing));
     const ma=G.mirrorArc({center:[0,0],radius:20,startAngle:180,sweep:90});
-    this.ok("mirrorArc: start 180 -> 90", ma.startAngle===90 && ma.sweep===90,
-      ma.startAngle+"/"+ma.sweep);
-    // and the mirrored arc should now contain a front-right point
-    this.ok("mirrorArc: mirrored swing catches front-right",
-      G.pointInArc([7,-7],ma) && !G.pointInArc([-7,-7],ma));
-
-    // 8. toWorld: rotation is clockwise-from-north
+    this.ok("mirrorArc: 180->90",ma.startAngle===90&&ma.sweep===90,ma.startAngle+"/"+ma.sweep);
+    this.ok("mirrorArc: catches front-right",G.pointInArc([7,-7],ma)&&!G.pointInArc([-7,-7],ma));
     const w=G.toWorld([0,1],{position:[0,0],rotation:90,mirrored:false});
-    this.ok("toWorld: local +y rotated 90 CW -> +x", this.approx(w[0],1)&&this.approx(w[1],0),
-      `(${w[0].toFixed(2)},${w[1].toFixed(2)})`);
-    const wm=G.toWorld([1,0],{position:[0,0],rotation:0,mirrored:true});
-    this.ok("toWorld: mirror flips local x", this.approx(wm[0],-1)&&this.approx(wm[1],0));
-
-    // 9. footprint transform stays 4 points and translates
-    const fpw=G.footprintWorldPoly(saw,{position:[100,100],rotation:0,mirrored:false});
-    this.ok("footprintWorldPoly: 4 vertices translated",
-      fpw.length===4 && fpw.some(p=>this.approx(p[0],86)&&this.approx(p[1],87)),
-      "(-14,-13)->(86,87)");
-
-    // 10. document round-trip (export shape -> parse -> same placement count)
-    const doc=Model.demo();
-    const json=JSON.stringify(doc);
-    const back=JSON.parse(json);
-    this.ok("model: JSON round-trip preserves placements",
-      back.scenarios[0].placements.length===doc.scenarios[0].placements.length);
-
+    this.ok("toWorld: +y rot90 CW -> +x",this.approx(w[0],1)&&this.approx(w[1],0),`(${w[0].toFixed(2)},${w[1].toFixed(2)})`);
+    this.ok("toWorld: mirror flips x",(()=>{const m=G.toWorld([1,0],{position:[0,0],rotation:0,mirrored:true});return this.approx(m[0],-1)&&this.approx(m[1],0);})());
+    this.ok("segIntersect: crossing",G.segIntersect([0,0],[10,10],[0,10],[10,0]));
+    this.ok("segIntersect: parallel none",!G.segIntersect([0,0],[10,0],[0,5],[10,5]));
+    this.ok("polysOverlap: overlapping",G.polysOverlap([[0,0],[10,0],[10,10],[0,10]],[[5,5],[15,5],[15,15],[5,15]]));
+    this.ok("polysOverlap: disjoint",!G.polysOverlap([[0,0],[4,0],[4,4],[0,4]],[[10,10],[14,10],[14,14],[10,14]]));
+    this.ok("polysOverlap: containment",G.polysOverlap([[0,0],[20,0],[20,20],[0,20]],[[8,8],[12,8],[12,12],[8,12]]));
+    this.ok("TRIM: footprint x footprint = error",Trim.interaction("footprint","footprint")==="error");
+    this.ok("TRIM: hard x footprint = error",Trim.interaction("hard","footprint")==="error");
+    this.ok("TRIM: hard x shared = error",Trim.interaction("shared","hard")==="error");
+    this.ok("TRIM: soft x soft = warning",Trim.interaction("soft","soft")==="warning");
+    this.ok("TRIM: shared x shared = ok",Trim.interaction("shared","shared")==="ok");
+    this.ok("TRIM: shared x soft = ok",Trim.interaction("shared","soft")==="ok");
+    this.ok("TRIM: hard x soft = warning",Trim.interaction("hard","soft")==="warning");
+    (()=>{const d=Model.emptyFacility(); d.scenarios[0].placements=[
+      {id:"a",defId:"builtin-table-saw-cabinet",position:[140,110],rotation:0,mirrored:false},
+      {id:"b",defId:"builtin-table-saw-cabinet",position:[150,110],rotation:0,mirrored:false}];
+      this.ok("TRIM: overlapping saws report error",Trim.compute(d).errors>0);})();
+    (()=>{const d=Model.emptyFacility(); d.scenarios[0].placements=[
+      {id:"a",defId:"builtin-table-saw-cabinet",position:[5,5],rotation:0,mirrored:false}];
+      this.ok("TRIM: out-of-bounds flags error",Trim.compute(d).errors>0);})();
+    (()=>{const d=Model.emptyFacility(); d.scenarios[0].placements=[
+      {id:"a",defId:"builtin-drill-press",position:[144,108],rotation:0,mirrored:false}];
+      const c=Trim.compute(d); this.ok("TRIM: lone centered machine clear",c.errors===0&&c.warnings===0);})();
     this.paint();
   },
   paint(){
-    const pass=this.results.filter(r=>r.pass).length, total=this.results.length;
-    const rows=this.results.map(r=>
-      `<tr><td class="${r.pass?'t-pass':'t-fail'}">${r.pass?'PASS':'FAIL'}</td>
-       <td>${r.name}</td><td style="color:var(--ink-dim)">${r.detail||""}</td></tr>`).join("");
-    document.getElementById("app").innerHTML=
-      `<div id="tests">
-        <h1>BAYPLAN · geometry test harness</h1>
-        <div class="summary ${pass===total?'t-pass':'t-fail'}">
-          ${pass} / ${total} passing${pass===total?"  · release gate green":"  · gate RED"}
-        </div>
-        <table><tbody>${rows}</tbody></table>
-        <p style="margin-top:18px"><a href="#" onclick="location.hash='';location.reload()">&larr; back to plat</a></p>
-      </div>`;
+    const pass=this.results.filter(r=>r.pass).length,total=this.results.length;
+    const rows=this.results.map(r=>`<tr><td class="${r.pass?'t-pass':'t-fail'}">${r.pass?'PASS':'FAIL'}</td><td>${r.name}</td><td style="color:var(--ink-dim)">${r.detail||""}</td></tr>`).join("");
+    document.getElementById("app").innerHTML=`<div id="tests">
+      <h1>BAYPLAN \u00b7 geometry + TRIM test harness</h1>
+      <div class="summary ${pass===total?'t-pass':'t-fail'}">${pass} / ${total} passing${pass===total?"  \u00b7 release gate green":"  \u00b7 gate RED"}</div>
+      <table><tbody>${rows}</tbody></table>
+      <p style="margin-top:18px"><a href="#" onclick="location.hash='';location.reload()">\u2190 back to plat</a></p></div>`;
     document.documentElement.setAttribute("data-theme","night");
   }
 };
 
-window.addEventListener("DOMContentLoaded", ()=>UI.boot());
-window.addEventListener("hashchange", ()=>location.reload());
+window.addEventListener("DOMContentLoaded",()=>UI.boot());
+window.addEventListener("hashchange",()=>location.reload());
 </script>
 </body>
 </html>

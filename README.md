@@ -14,7 +14,7 @@ Three things, all in the data model rather than the UI:
 
 ## Status
 
-Scaffold, v0.0.1. This release stands up the structure: the geometry core (rect-off-edge resolution, point-in-arc, and the placement transform with mirroring), the embedded built-in library, the SVG plat render, the theme system, and a passing test harness. Placement editing, conflict checking, flow, and the utilities graph are specified and scheduled but not yet wired.
+v0.0.2. The STOWAGE and TRIM stations are now live. You can add machines from the shelf, drag them around the floor, rotate, mirror, lock, and delete them, and the clearance checker (TRIM) runs on every change: footprints and halos light up red for errors and amber for warnings, with a running conflict list and a footer tally. The earlier v0.0.1 scaffold stood up the geometry core (rect-off-edge resolution, point-in-arc, and the placement transform with mirroring), the built-in library, the plat render, the theme system, and the test harness. Material flow and the utilities graph are specified and scheduled but not yet wired.
 
 ## Repository layout
 
@@ -34,9 +34,11 @@ The seed embedded in `bayplan.html` is spliced in from `bayplan-seed-library.jso
 
 Open `bayplan.html` in a browser. It runs from `file://` with no server, no network, and no build step. On first load it shows a small demo shop so the plat is not blank.
 
+Editing: click a machine to select it, drag to move (snaps to one inch, hold Alt for free movement). With something selected, R rotates ninety degrees (Shift+R the other way), M mirrors, L locks, Delete removes, and arrow keys nudge by the grid. All of the same actions are available as buttons in the Selection panel for touch. Add machines from the shelf in the sidebar.
+
 ## Tests
 
-The geometry test harness is browser-runnable at `bayplan.html#test`. It is seeded with the built-in library as its fixture and covers bounds with offset anchors, edge projection, point-in-polygon, the bearing convention, point-in-arc, the mirror transform, the placement transform, and a document round-trip. The release gate is green only when every assertion passes.
+The test harness is browser-runnable at `bayplan.html#test`, seeded with the built-in library as its fixture. It covers the geometry core (bounds with offset anchors, edge projection, point-in-polygon, the bearing convention, point-in-arc, the mirror transform, the placement transform, segment intersection, and polygon overlap) and the TRIM checker (the full severity-interaction matrix plus end-to-end scenarios: overlapping machines, out-of-bounds, a clear layout, and the shared-over-soft feed-lane coexistence case). The release gate is green only when every assertion passes.
 
 ## Local frame convention
 
@@ -44,17 +46,19 @@ Origin at the machine anchor, +y back (away from the operator), +x to the operat
 
 ## Known Limitations
 
-- Placement is not yet editable in the UI. The demo scenario is fixed; you cannot drag, rotate, or add machines from within `bayplan.html` in this release.
-- Conflict checking is not wired. The geometry to detect overlaps exists and is tested, but the checker that walks a scenario and reports hard, soft, and shared conflicts is not built.
+- Only a single rectangular facility is supported in the UI. The model allows an arbitrary boundary polygon, but there is no wall-drawing tool yet, and features (doors, columns, windows) are not placeable, so door-swing conflicts are not checked.
+- Only one scenario. Scenario-compare (current versus proposed side by side) is in the data model but not in the UI.
+- Conflict checking is pairwise and geometric. It does not yet account for `minHeight`, so a feed lane passing over a low cabinet is still flagged as if the cabinet were full height. Honoring `minHeight` is the next refinement to TRIM.
+- No undo. Deleting or moving is immediate; recovery is by re-adding or dragging back.
 - Material flow and the utilities graph are specified only. No flow paths, no duct runs, no load rollups yet.
 - QUARTERMASTER seed import is designed (provenance fields are in the schema) but not implemented.
-- Arc clearances render and test as filled wedges. Annular arcs (with an inner radius) are supported in the model and sampled correctly, but no seed machine exercises one yet.
-- The plat export produces the on-screen title block only. A full printable plat with legend and revision block is a PLAT-station item, still open.
+- Annular arcs (with an inner radius) are supported in the model and sampled correctly, but no seed machine exercises one yet.
+- The plat export produces the JSON document, not a printable sheet. A full printable plat with legend and revision block is a PLAT-station item, still open.
 - Import validation is shallow. It checks for a facility and a scenarios array; it does not yet validate the full schema or migrate older schema versions.
 
 ## Roadmap
 
-BAYPLAN runs an eight-station arc: SOUNDING (set the floor), MANIFEST (build the library), ENVELOPE (define the halos), STOWAGE (place), TRIM (balance conflicts), ROUTING (material flow), SERVICES (utilities graph), PLAT (compare and issue). This scaffold delivers ENVELOPE's built-in defaults and the render foundation. STOWAGE and TRIM are next. See the station arc in `bayplan-data-model.md`.
+BAYPLAN runs an eight-station arc: SOUNDING (set the floor), MANIFEST (build the library), ENVELOPE (define the halos), STOWAGE (place), TRIM (balance conflicts), ROUTING (material flow), SERVICES (utilities graph), PLAT (compare and issue). Delivered so far: ENVELOPE's built-in defaults, the render foundation, and now STOWAGE and TRIM. Next is ROUTING (material flow), then SERVICES (the utilities graph), with SOUNDING (a real wall-drawing tool and placeable features) and PLAT (scenario-compare and a printable sheet) rounding out the arc. See the station arc in `bayplan-data-model.md`.
 
 ## License
 
