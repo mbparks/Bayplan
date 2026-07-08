@@ -1,0 +1,1533 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "bayplan-seed-library",
+  "generated": "2026-07-08",
+  "frame": {
+    "units": "inches",
+    "origin": "anchor",
+    "axes": "+x operator-right, +y back (away from operator)",
+    "edges": "front=min y, back=max y, left=min x, right=max x",
+    "arcAngles": "degrees clockwise from +y (back): 0=back,90=right,180=front,270=left",
+    "note": "Defaults for tuning. minHeight null means full height (floor to head)."
+  },
+  "library": [
+    {
+      "id": "builtin-table-saw-cabinet",
+      "name": "Table saw (3HP cabinet, 36in fence)",
+      "category": "table_saw",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -14,
+            -13
+          ],
+          [
+            30,
+            -13
+          ],
+          [
+            30,
+            14
+          ],
+          [
+            -14,
+            14
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "blade, at kerf line",
+      "height": 34,
+      "weight": 500,
+      "power": {
+        "voltage": 240,
+        "amps": 15,
+        "phase": 1,
+        "dedicated": true
+      },
+      "dustPort": {
+        "position": [
+          0,
+          -6
+        ],
+        "diameter": 4
+      },
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 96
+          },
+          "label": "infeed",
+          "severity": "shared",
+          "minHeight": 40,
+          "note": "8ft infeed to rip full sheets; clear only to table height"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "back",
+            "depth": 96
+          },
+          "label": "outfeed",
+          "severity": "shared",
+          "minHeight": 40,
+          "note": "8ft outfeed for ripped stock; overlaps aisles by design"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 36
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "operator stance at the front, full height"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "right",
+            "depth": 40
+          },
+          "label": "blade_access",
+          "severity": "soft",
+          "minHeight": 40,
+          "note": "36in rip capacity to the right of the blade"
+        }
+      ],
+      "ports": [
+        {
+          "id": "in",
+          "label": "stock_in",
+          "position": [
+            0,
+            -13
+          ]
+        },
+        {
+          "id": "out",
+          "label": "stock_out",
+          "position": [
+            0,
+            14
+          ]
+        }
+      ]
+    },
+    {
+      "id": "builtin-jointer-8in",
+      "name": "Jointer (8in, long bed)",
+      "category": "jointer",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -36.0,
+            -11.0
+          ],
+          [
+            36.0,
+            -11.0
+          ],
+          [
+            36.0,
+            11.0
+          ],
+          [
+            -36.0,
+            11.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "cutterhead, bed center",
+      "height": 34,
+      "weight": 450,
+      "power": {
+        "voltage": 240,
+        "amps": 12,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": {
+        "position": [
+          0,
+          8
+        ],
+        "diameter": 4
+      },
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "left",
+            "depth": 72
+          },
+          "label": "infeed",
+          "severity": "shared",
+          "minHeight": 38,
+          "note": "long-board infeed along the bed axis"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "right",
+            "depth": 72
+          },
+          "label": "outfeed",
+          "severity": "shared",
+          "minHeight": 38,
+          "note": "long-board outfeed along the bed axis"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "operator works along the front of the bed"
+        }
+      ],
+      "ports": [
+        {
+          "id": "in",
+          "label": "stock_in",
+          "position": [
+            -36,
+            0
+          ]
+        },
+        {
+          "id": "out",
+          "label": "stock_out",
+          "position": [
+            36,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "builtin-planer-13in",
+      "name": "Thickness planer (13in benchtop on stand)",
+      "category": "planer",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -12.0,
+            -11.0
+          ],
+          [
+            12.0,
+            -11.0
+          ],
+          [
+            12.0,
+            11.0
+          ],
+          [
+            -12.0,
+            11.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "cutterhead center",
+      "height": 38,
+      "weight": 90,
+      "power": {
+        "voltage": 120,
+        "amps": 15,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": {
+        "position": [
+          0,
+          10
+        ],
+        "diameter": 4
+      },
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 96
+          },
+          "label": "infeed",
+          "severity": "shared",
+          "minHeight": 42,
+          "note": "long-board infeed; feeds front to back"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "back",
+            "depth": 96
+          },
+          "label": "outfeed",
+          "severity": "shared",
+          "minHeight": 42,
+          "note": "long-board outfeed"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "operator at infeed"
+        }
+      ],
+      "ports": [
+        {
+          "id": "in",
+          "label": "stock_in",
+          "position": [
+            0,
+            -11
+          ]
+        },
+        {
+          "id": "out",
+          "label": "stock_out",
+          "position": [
+            0,
+            11
+          ]
+        }
+      ]
+    },
+    {
+      "id": "builtin-bandsaw-14in",
+      "name": "Bandsaw (14in)",
+      "category": "bandsaw",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -13.0,
+            -15.0
+          ],
+          [
+            13.0,
+            -15.0
+          ],
+          [
+            13.0,
+            15.0
+          ],
+          [
+            -13.0,
+            15.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "blade at table slot",
+      "height": 43,
+      "weight": 250,
+      "power": {
+        "voltage": 120,
+        "amps": 15,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": {
+        "position": [
+          0,
+          6
+        ],
+        "diameter": 4
+      },
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 72
+          },
+          "label": "infeed",
+          "severity": "shared",
+          "minHeight": 46,
+          "note": "resaw infeed for long stock"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "back",
+            "depth": 72
+          },
+          "label": "outfeed",
+          "severity": "shared",
+          "minHeight": 46,
+          "note": "resaw outfeed"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "operator at the front of the table"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 8
+          },
+          "label": "blade_access",
+          "severity": "hard",
+          "minHeight": null,
+          "note": "immediate blade danger zone, keep clear"
+        }
+      ],
+      "ports": [
+        {
+          "id": "in",
+          "label": "stock_in",
+          "position": [
+            0,
+            -15
+          ]
+        },
+        {
+          "id": "out",
+          "label": "stock_out",
+          "position": [
+            0,
+            15
+          ]
+        }
+      ]
+    },
+    {
+      "id": "builtin-miter-saw",
+      "name": "Miter saw (compound, station)",
+      "category": "miter_saw",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -12.0,
+            -10.0
+          ],
+          [
+            12.0,
+            -10.0
+          ],
+          [
+            12.0,
+            10.0
+          ],
+          [
+            -12.0,
+            10.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "blade at fence intersection",
+      "height": 36,
+      "weight": 55,
+      "power": {
+        "voltage": 120,
+        "amps": 15,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": {
+        "position": [
+          0,
+          8
+        ],
+        "diameter": 2.5
+      },
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "left",
+            "depth": 96
+          },
+          "label": "infeed",
+          "severity": "shared",
+          "minHeight": 40,
+          "note": "long-trim support to the left; 8ft ideal"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "right",
+            "depth": 96
+          },
+          "label": "outfeed",
+          "severity": "shared",
+          "minHeight": 40,
+          "note": "long-trim support to the right"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "operator at the front"
+        }
+      ],
+      "ports": [
+        {
+          "id": "in",
+          "label": "stock_in",
+          "position": [
+            -12,
+            0
+          ]
+        },
+        {
+          "id": "out",
+          "label": "stock_out",
+          "position": [
+            12,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "id": "builtin-drill-press",
+      "name": "Drill press (floor standing)",
+      "category": "drill_press",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -10.0,
+            -12.0
+          ],
+          [
+            10.0,
+            -12.0
+          ],
+          [
+            10.0,
+            12.0
+          ],
+          [
+            -10.0,
+            12.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "spindle / chuck axis",
+      "height": 66,
+      "weight": 200,
+      "power": {
+        "voltage": 120,
+        "amps": 12,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": null,
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "operator at the front"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "left",
+            "depth": 36
+          },
+          "label": "loading",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "long-work overhang support, left"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "right",
+            "depth": 36
+          },
+          "label": "loading",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "long-work overhang support, right"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "id": "builtin-wood-lathe",
+      "name": "Wood lathe (with outboard turning)",
+      "category": "lathe",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -6,
+            -9
+          ],
+          [
+            42,
+            -9
+          ],
+          [
+            42,
+            9
+          ],
+          [
+            -6,
+            9
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "headstock spindle",
+      "height": 44,
+      "weight": 220,
+      "power": {
+        "voltage": 120,
+        "amps": 15,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": null,
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "turner stands along the front of the bed"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "right",
+            "depth": 24
+          },
+          "label": "end_clearance",
+          "severity": "soft",
+          "minHeight": 44,
+          "note": "tailstock end, room for long spindle stock"
+        },
+        {
+          "shape": "arc",
+          "geometry": {
+            "center": [
+              0,
+              0
+            ],
+            "radius": 20,
+            "startAngle": 180,
+            "sweep": 90
+          },
+          "label": "swing",
+          "severity": "hard",
+          "minHeight": null,
+          "note": "outboard bowl swing off the headstock, front-left arc"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "id": "builtin-metal-lathe",
+      "name": "Metal lathe (benchtop)",
+      "category": "metal_lathe",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -3,
+            -7
+          ],
+          [
+            27,
+            -7
+          ],
+          [
+            27,
+            7
+          ],
+          [
+            -3,
+            7
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "spindle / chuck",
+      "height": 16,
+      "weight": 300,
+      "power": {
+        "voltage": 120,
+        "amps": 15,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": null,
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "left",
+            "depth": 24
+          },
+          "label": "end_clearance",
+          "severity": "hard",
+          "minHeight": null,
+          "note": "bar stock protruding through the spindle bore"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "right",
+            "depth": 18
+          },
+          "label": "end_clearance",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "tailstock end for long work"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 24
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "operator at the carriage"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "id": "builtin-mill-benchtop",
+      "name": "Milling machine (benchtop)",
+      "category": "mill",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -12.0,
+            -10.0
+          ],
+          [
+            12.0,
+            -10.0
+          ],
+          [
+            12.0,
+            10.0
+          ],
+          [
+            -12.0,
+            10.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "spindle axis",
+      "height": 32,
+      "weight": 350,
+      "power": {
+        "voltage": 120,
+        "amps": 15,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": null,
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "left",
+            "depth": 16
+          },
+          "label": "service",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "X-table travel overhang, left"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "right",
+            "depth": 16
+          },
+          "label": "service",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "X-table travel overhang, right"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 24
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "operator at the handwheels"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "id": "builtin-cnc-router-4x4",
+      "name": "CNC router (4x4 bed)",
+      "category": "cnc_router",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -30.0,
+            -30.0
+          ],
+          [
+            30.0,
+            -30.0
+          ],
+          [
+            30.0,
+            30.0
+          ],
+          [
+            -30.0,
+            30.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "spoilboard center",
+      "height": 48,
+      "weight": 400,
+      "power": {
+        "voltage": 120,
+        "amps": 15,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": {
+        "position": [
+          0,
+          0
+        ],
+        "diameter": 2.5
+      },
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 48
+          },
+          "label": "loading",
+          "severity": "shared",
+          "minHeight": null,
+          "note": "material load and unload from the front"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "operator and pendant at the front"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "back",
+            "depth": 18
+          },
+          "label": "service",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "rear access for wiring and gantry service"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "left",
+            "depth": 18
+          },
+          "label": "service",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "side access for bit changes"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "right",
+            "depth": 18
+          },
+          "label": "service",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "side access for bit changes"
+        }
+      ],
+      "ports": [
+        {
+          "id": "in",
+          "label": "stock_in",
+          "position": [
+            0,
+            -30
+          ]
+        }
+      ]
+    },
+    {
+      "id": "builtin-welding-table",
+      "name": "Welding table (with MIG)",
+      "category": "welding",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -15.0,
+            -30.0
+          ],
+          [
+            15.0,
+            -30.0
+          ],
+          [
+            15.0,
+            30.0
+          ],
+          [
+            -15.0,
+            30.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "table center",
+      "height": 34,
+      "weight": 350,
+      "power": {
+        "voltage": 240,
+        "amps": 50,
+        "phase": 1,
+        "dedicated": true
+      },
+      "dustPort": null,
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 48
+          },
+          "label": "service",
+          "severity": "hard",
+          "minHeight": null,
+          "note": "spark and slag spray zone, keep combustibles clear"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "left",
+            "depth": 24
+          },
+          "label": "service",
+          "severity": "hard",
+          "minHeight": null,
+          "note": "spark standoff, left"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "right",
+            "depth": 24
+          },
+          "label": "service",
+          "severity": "hard",
+          "minHeight": null,
+          "note": "spark standoff, right"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 36
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "welder position, overlaps the spark zone"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "id": "builtin-bench-grinder",
+      "name": "Bench grinder (pedestal)",
+      "category": "grinder",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -8.0,
+            -7.0
+          ],
+          [
+            8.0,
+            -7.0
+          ],
+          [
+            8.0,
+            7.0
+          ],
+          [
+            -8.0,
+            7.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "between the wheels",
+      "height": 44,
+      "weight": 60,
+      "power": {
+        "voltage": 120,
+        "amps": 12,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": null,
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 36
+          },
+          "label": "service",
+          "severity": "hard",
+          "minHeight": null,
+          "note": "spark cone projecting forward from the wheels"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "operator at the tool rests"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "id": "builtin-assembly-table",
+      "name": "Assembly table (4x8)",
+      "category": "assembly",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -24.0,
+            -48.0
+          ],
+          [
+            24.0,
+            -48.0
+          ],
+          [
+            24.0,
+            48.0
+          ],
+          [
+            -24.0,
+            48.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "table center",
+      "height": 34,
+      "weight": 300,
+      "power": {
+        "voltage": 120,
+        "amps": 15,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": null,
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "shared",
+          "minHeight": null,
+          "note": "work apron; shares space with aisles and neighbor outfeed"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "back",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "shared",
+          "minHeight": null,
+          "note": "work apron, far side"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "left",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "shared",
+          "minHeight": null,
+          "note": "work apron, left"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "right",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "shared",
+          "minHeight": null,
+          "note": "work apron, right"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "id": "builtin-workbench",
+      "name": "Workbench (with front and end vise)",
+      "category": "bench",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -12.0,
+            -36.0
+          ],
+          [
+            12.0,
+            -36.0
+          ],
+          [
+            12.0,
+            36.0
+          ],
+          [
+            -12.0,
+            36.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "bench center",
+      "height": 34,
+      "weight": 250,
+      "power": {
+        "voltage": 120,
+        "amps": 15,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": null,
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 36
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "primary working side at the front vise"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "right",
+            "depth": 24
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "end-vise work clearance"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "id": "builtin-dust-collector",
+      "name": "Dust collector (2HP cyclone)",
+      "category": "dust_collector",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -15.0,
+            -20.0
+          ],
+          [
+            15.0,
+            -20.0
+          ],
+          [
+            15.0,
+            20.0
+          ],
+          [
+            -15.0,
+            20.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "inlet center",
+      "height": 78,
+      "weight": 200,
+      "power": {
+        "voltage": 240,
+        "amps": 12,
+        "phase": 1,
+        "dedicated": true
+      },
+      "dustPort": null,
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 30
+          },
+          "label": "service",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "bin and filter service access"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "id": "builtin-air-compressor",
+      "name": "Air compressor (vertical 60gal)",
+      "category": "compressor",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -12.0,
+            -13.0
+          ],
+          [
+            12.0,
+            -13.0
+          ],
+          [
+            12.0,
+            13.0
+          ],
+          [
+            -12.0,
+            13.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "tank center",
+      "height": 68,
+      "weight": 250,
+      "power": {
+        "voltage": 240,
+        "amps": 15,
+        "phase": 1,
+        "dedicated": true
+      },
+      "dustPort": null,
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 24
+          },
+          "label": "service",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "drain, regulator, and pump access"
+        },
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "back",
+            "depth": 12
+          },
+          "label": "service",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "cooling and heat clearance behind the pump"
+        }
+      ],
+      "ports": []
+    },
+    {
+      "id": "builtin-electronics-bench",
+      "name": "Electronics bench (ESD)",
+      "category": "electronics",
+      "provenance": {
+        "source": "builtin",
+        "qmAssetId": null,
+        "seededFields": [],
+        "seededAt": null,
+        "localEdits": []
+      },
+      "footprint": {
+        "vertices": [
+          [
+            -15.0,
+            -30.0
+          ],
+          [
+            15.0,
+            -30.0
+          ],
+          [
+            15.0,
+            30.0
+          ],
+          [
+            -15.0,
+            30.0
+          ]
+        ]
+      },
+      "anchor": [
+        0,
+        0
+      ],
+      "anchorNote": "bench center",
+      "height": 34,
+      "weight": 200,
+      "power": {
+        "voltage": 120,
+        "amps": 20,
+        "phase": 1,
+        "dedicated": false
+      },
+      "dustPort": null,
+      "clearances": [
+        {
+          "shape": "rect",
+          "geometry": {
+            "edge": "front",
+            "depth": 30
+          },
+          "label": "operator",
+          "severity": "soft",
+          "minHeight": null,
+          "note": "seated operator, chair plus reach"
+        }
+      ],
+      "ports": []
+    }
+  ]
+}
