@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.13 | build-marker: plat-print-2026-07-08 -->
+<!-- BAYPLAN FI-075 | v0.0.14 | build-marker: dragfix2-2026-07-08 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -62,7 +62,7 @@
   .seg button:first-child{border-left:0}
   .seg button[aria-pressed="true"]{background:var(--brass); color:#111}
   main{flex:1; display:flex; min-height:0}
-  .stage{flex:1; position:relative; overflow:hidden; touch-action:none}
+  .stage{flex:1; position:relative; overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none}
   svg{width:100%; height:100%; display:block}
   aside{
     width:288px; border-left:1px solid var(--line); background:var(--panel);
@@ -137,7 +137,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.13  (PLAT: compare picker + fixed-scale multi-page print)
+   BAYPLAN FI-075  v0.0.14  (fix: robust screen-to-world mapping; on-screen title block removed)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -729,9 +729,14 @@ const View = {
   refresh(){this.conflicts=Trim.compute(this.doc); this.draw(); UI.syncPanels(); History.record(this.doc);},
   toScreen(pt){return[pt[0]-this._b.minX+this.pad, this._H-(pt[1]-this._b.minY)+this.pad];},
   screenToWorld(clientX,clientY){
-    const svg=this.el.querySelector("svg"); const m=svg.getScreenCTM().inverse();
-    const p=svg.createSVGPoint(); p.x=clientX; p.y=clientY; const u=p.matrixTransform(m);
-    return[u.x-this.pad+this._b.minX, this._b.minY+this._H+this.pad-u.y];},
+    const svg=this.el.querySelector("svg"); if(!svg||!this._b) return [0,0];
+    const rect=svg.getBoundingClientRect();
+    const vbW=(this._b.maxX-this._b.minX)+this.pad*2, vbH=(this._b.maxY-this._b.minY)+this.pad*2;
+    // invert preserveAspectRatio="xMidYMid meet": uniform scale to fit, content centered
+    const scale=Math.min(rect.width/vbW, rect.height/vbH) || 1;
+    const offX=(rect.width - vbW*scale)/2, offY=(rect.height - vbH*scale)/2;
+    const vx=(clientX-rect.left-offX)/scale, vy=(clientY-rect.top-offY)/scale;
+    return [vx-this.pad+this._b.minX, this._b.minY+this._H+this.pad-vy];},
   polyStr(pts){return pts.map(p=>this.toScreen(p).join(",")).join(" ");},
   sevColor(s){return s==="error"?"var(--hard)":s==="warning"?"var(--soft)":null;},
   draw(){
@@ -837,16 +842,10 @@ const View = {
       pts.forEach((a,i)=>{const first=i===0;
         g+=`<circle cx="${a[0]}" cy="${a[1]}" r="${first?5:3.5}" fill="${first?'var(--brass)':'var(--ground)'}" stroke="var(--brass)" stroke-width="1.5"/>`;});
     }
-    const bw=150,bh=54,bx=vbW-bw-6,by=vbH-bh-6;
-    g+=`<g font-family="var(--font-mono)" style="pointer-events:none">
-      <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="var(--panel)" stroke="var(--ink)" stroke-width="1"/>
-      <line x1="${bx}" y1="${by+18}" x2="${bx+bw}" y2="${by+18}" stroke="var(--line)"/>
-      <text x="${bx+8}" y="${by+13}" fill="var(--ink)" font-size="9" letter-spacing="1.5">${(doc.meta.title||'UNTITLED').toUpperCase()}</text>
-      <text x="${bx+8}" y="${by+32}" fill="var(--ink-dim)" font-size="8">SCALE 1in = 1in \u00b7 IMPERIAL</text>
-      <text x="${bx+8}" y="${by+45}" fill="var(--ink-dim)" font-size="8">BAYPLAN FI-075 \u00b7 ${sc.name.toUpperCase()}</text>
-      <g transform="translate(${bx+bw-20},${by+34})">
-        <polygon points="0,-13 4,4 0,0 -4,4" fill="var(--brass)"/>
-        <text x="0" y="-16" fill="var(--brass)" font-size="8" text-anchor="middle">N</text></g></g>`;
+    // north arrow, bottom-right (title block is reserved for the printed plat)
+    g+=`<g transform="translate(${vbW-18},${vbH-14})" style="pointer-events:none">
+      <polygon points="0,-11 3.5,4 0,1 -3.5,4" fill="var(--brass)"/>
+      <text x="0" y="-13" fill="var(--brass)" font-size="8" font-family="var(--font-mono)" text-anchor="middle">N</text></g>`;
     this.el.innerHTML=`<svg viewBox="0 0 ${vbW} ${vbH}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Workshop floor plat">${g}</svg>`;
   },
   // shared feature renderer (columns, doors, windows), used by draw and platSVG
@@ -959,6 +958,8 @@ const View = {
     let drag=null;
     host.addEventListener("pointerdown",e=>{
       if(!this.el.querySelector("svg")) return;
+      if(e.button!=null && e.button!==0) return; // primary button / touch only
+      e.preventDefault();
       const w=this.screenToWorld(e.clientX,e.clientY);
       const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
       if(UI.mode==="drawwalls"){
@@ -1957,22 +1958,31 @@ const Tests = {
     (()=>{const savedEl=View.el, savedSync=UI.syncPanels, savedMode=UI.mode, savedDoc=UI.doc, savedSel=UI.selectedId;
       try{
         UI.syncPanels=function(){};
-        const idM={inverse(){return this;}};
-        const mkSvg=()=>({getScreenCTM(){return idM;},createSVGPoint(){return {x:0,y:0,matrixTransform(){return {x:this.x,y:this.y};}};}});
-        const H={}; let svg=mkSvg();
-        const host={style:{},set innerHTML(v){svg=mkSvg();},get innerHTML(){return "";},
-          querySelector(){return svg;},addEventListener(t,fn){H[t]=fn;},setPointerCapture(){},releasePointerCapture(){}};
+        // fake svg with a realistic letterboxed bounding rect (offset + scale != 1) to exercise the mapping
+        const RECT={left:37,top:19,width:0,height:0,scale:2};
+        const svgEl={getBoundingClientRect(){const b=View._b,p=View.pad;
+          const vbW=(b.maxX-b.minX)+p*2, vbH=(b.maxY-b.minY)+p*2;
+          return {left:RECT.left,top:RECT.top,width:vbW*RECT.scale + 80, height:vbH*RECT.scale + 40};}};
+        const H={};
+        const host={style:{},set innerHTML(v){},get innerHTML(){return "";},
+          querySelector(){return svgEl;},addEventListener(t,fn){H[t]=fn;},setPointerCapture(){},releasePointerCapture(){}};
         View.mount(host);
         const d=Model.emptyFacility();
         d.scenarios[0].placements=[{id:"z",defId:"builtin-drill-press",position:[100,100],rotation:0,mirrored:false}];
         UI.mode="select"; UI.selectedId=null; UI.doc=d; History.reset(); View.scene(d);
-        const scr=View.toScreen([100,100]);
-        H.pointerdown({clientX:scr[0],clientY:scr[1],pointerId:9,altKey:false});
-        const t=View.toScreen([140,80]);
-        H.pointermove({clientX:t[0],clientY:t[1],pointerId:9,altKey:false});
+        // client coords for a world point, matching the fake rect's letterbox+scale
+        const toClient=(wpt)=>{const s=View.toScreen(wpt); const b=View._b,p=View.pad;
+          const vbW=(b.maxX-b.minX)+p*2, vbH=(b.maxY-b.minY)+p*2;
+          const r=svgEl.getBoundingClientRect(); const sc=Math.min(r.width/vbW,r.height/vbH);
+          const offX=(r.width-vbW*sc)/2, offY=(r.height-vbH*sc)/2;
+          return [r.left+offX+s[0]*sc, r.top+offY+s[1]*sc];};
+        const p0=toClient([100,100]);
+        H.pointerdown({clientX:p0[0],clientY:p0[1],pointerId:9,altKey:false,button:0,preventDefault(){}});
+        const p1=toClient([140,80]);
+        H.pointermove({clientX:p1[0],clientY:p1[1],pointerId:9,altKey:false});
         H.pointerup({pointerId:9});
         const p=d.scenarios[0].placements[0].position;
-        this.ok("INTERACTION: a machine drag survives the select redraw",p[0]===140&&p[1]===80,p.join(","));
+        this.ok("INTERACTION: a drag maps through a letterboxed viewport and survives the select redraw",p[0]===140&&p[1]===80,p.join(","));
       } finally { UI.syncPanels=savedSync; UI.mode=savedMode; UI.doc=savedDoc; UI.selectedId=savedSel; if(savedEl)View.mount(savedEl); }
     })();
     this.paint();
