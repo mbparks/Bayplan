@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.32 | build-marker: touch-pass-2026-07-08 -->
+<!-- BAYPLAN FI-075 | v0.0.33 | build-marker: header-groups-2026-07-09 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -47,7 +47,9 @@
   .fi{font-family:var(--font-mono); font-size:12px; color:var(--brass); letter-spacing:.1em}
   .tag{font-size:12px; color:var(--ink-dim); font-style:italic}
   .spacer{flex:1}
-  .toolbar{display:flex; gap:8px; flex-wrap:wrap}
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center}
+  .toolbar .grp{display:inline-flex; gap:6px; align-items:center}
+  .toolbar .div{width:1px; align-self:stretch; min-height:22px; background:var(--line); opacity:.6; margin:0 1px}
   button{
     font-family:var(--font-mono); font-size:12px; letter-spacing:.05em;
     color:var(--ink); background:var(--panel-2); border:1px solid var(--line);
@@ -144,7 +146,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.32  (touch pass: pinch-zoom, pan, larger tap targets)
+   BAYPLAN FI-075  v0.0.33  (header reorganized into logical groups)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -2391,43 +2393,63 @@ const UI = {
         <span class="wordmark">BAYPLAN</span><span class="fi">FI-075</span>
         <span class="tag">stow the floor</span><span class="spacer"></span>
         <div class="toolbar">
-          <span class="seg" role="group" aria-label="Scenario">
-            ${scenarios.map(s=>`<button data-scenario="${s.id}" aria-pressed="${s.id===activeSc}">${s.name}</button>`).join("")}
+          <span class="grp" aria-label="Scenarios">
+            <span class="seg" role="group" aria-label="Scenario">
+              ${scenarios.map(s=>`<button data-scenario="${s.id}" aria-pressed="${s.id===activeSc}">${s.name}</button>`).join("")}
+            </span>
+            <button id="dupBtn" title="Duplicate active scenario">+ Scenario</button>
+            <button id="compareBtn" title="Compare two scenarios" ${scenarios.length<2?'disabled':''}>Compare</button>
           </span>
-          <button id="dupBtn" title="Duplicate active scenario">+ Scenario</button>
-          <button id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo" ${History.canUndo()?'':'disabled'}>Undo</button>
-          <button id="redoBtn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" ${History.canRedo()?'':'disabled'}>Redo</button>
-          <button id="roomBtn">Room</button>
-          <button id="machineBtn" title="Define a custom machine">+ Machine</button>
-          <button id="noteBtn" title="Add a note to the plat">+ Note</button>
-          <button id="notesVisBtn" title="Show or hide notes" aria-pressed="${this.showNotes!==false}">${this.showNotes!==false?"\u25c9":"\u25ef"} Notes</button>
-          <button id="measureBtn">Measure</button>
-          <button id="dimBtn" title="Add a dimension line">+ Dim</button>
-          <span class="seg" role="group" aria-label="Zoom">
-            <button id="zoomOutBtn" title="Zoom out" aria-label="Zoom out">\u2212</button>
-            <button id="fitBtn" title="Fit the whole plat">Fit</button>
-            <button id="zoomInBtn" title="Zoom in" aria-label="Zoom in">+</button>
+          <span class="div"></span>
+          <span class="grp" aria-label="History">
+            <button id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo" ${History.canUndo()?'':'disabled'}>Undo</button>
+            <button id="redoBtn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" ${History.canRedo()?'':'disabled'}>Redo</button>
           </span>
-          <span class="seg" role="group" aria-label="Units">
-            <button data-units-btn="imperial" aria-pressed="${this.units()!=='metric'}">in</button>
-            <button data-units-btn="metric" aria-pressed="${this.units()==='metric'}">cm</button>
+          <span class="div"></span>
+          <span class="grp" aria-label="Draw and place">
+            <button id="roomBtn" title="Edit the room shape and features">Room</button>
+            <button id="machineBtn" title="Define a custom machine">+ Machine</button>
+            <button id="dimBtn" title="Add a dimension line">+ Dim</button>
+            <button id="noteBtn" title="Add a note to the plat">+ Note</button>
+            <button id="notesVisBtn" title="Show or hide notes" aria-pressed="${this.showNotes!==false}">${this.showNotes!==false?"\u25c9":"\u25ef"} Notes</button>
+            <button id="measureBtn" title="Measure a distance">Measure</button>
           </span>
-          <button id="compareBtn" ${scenarios.length<2?'disabled':''}>Compare</button>
-          <button id="printBtn">Print</button>
-          <button id="takeoffBtn" title="Materials shopping list">Takeoff</button>
-          <button id="panelBtn" title="Panel schedule">Panel</button>
-          <button id="lightingBtn" title="Lighting coverage">Lighting</button>
-          <button id="checkBtn" title="Readiness punch list" style="color:${readyColor}">${readyBadge}</button>
-          <button id="egressBtn" title="Circulation and egress">Egress</button>
-          <button id="newBtn">New</button>
-          <button id="importBtn">Import</button>
-          <button id="exportBtn">Export</button>
-          <button id="publishBtn" title="Bake a read-only plat to share">Publish</button>
-          <span id="saveState" title="Autosave" style="font-family:var(--font-mono); font-size:11px; color:var(--ink-dim); align-self:center; padding:0 4px"></span>
-          <span class="seg" role="group" aria-label="Theme">
-            <button data-theme-btn="night" aria-pressed="true">Night</button>
-            <button data-theme-btn="day" aria-pressed="false">Day</button>
-            <button data-theme-btn="contrast" aria-pressed="false">Contrast</button>
+          <span class="div"></span>
+          <span class="grp" aria-label="View">
+            <span class="seg" role="group" aria-label="Zoom">
+              <button id="zoomOutBtn" title="Zoom out" aria-label="Zoom out">\u2212</button>
+              <button id="fitBtn" title="Fit the whole plat">Fit</button>
+              <button id="zoomInBtn" title="Zoom in" aria-label="Zoom in">+</button>
+            </span>
+            <span class="seg" role="group" aria-label="Units">
+              <button data-units-btn="imperial" aria-pressed="${this.units()!=='metric'}">in</button>
+              <button data-units-btn="metric" aria-pressed="${this.units()==='metric'}">cm</button>
+            </span>
+          </span>
+          <span class="div"></span>
+          <span class="grp" aria-label="Reports">
+            <button id="checkBtn" title="Readiness punch list" style="color:${readyColor}">${readyBadge}</button>
+            <button id="takeoffBtn" title="Materials shopping list">Takeoff</button>
+            <button id="panelBtn" title="Panel schedule">Panel</button>
+            <button id="lightingBtn" title="Lighting coverage">Lighting</button>
+            <button id="egressBtn" title="Circulation and egress">Egress</button>
+            <button id="printBtn" title="Print the plat">Print</button>
+          </span>
+          <span class="div"></span>
+          <span class="grp" aria-label="File">
+            <button id="newBtn" title="Start a new plan">New</button>
+            <button id="importBtn" title="Open a .bayplan.json file">Import</button>
+            <button id="exportBtn" title="Save a .bayplan.json file">Export</button>
+            <button id="publishBtn" title="Bake a read-only plat to share">Publish</button>
+          </span>
+          <span class="div"></span>
+          <span class="grp" aria-label="Status">
+            <span id="saveState" title="Autosave" style="font-family:var(--font-mono); font-size:11px; color:var(--ink-dim); align-self:center; padding:0 2px"></span>
+            <span class="seg" role="group" aria-label="Theme">
+              <button data-theme-btn="night" aria-pressed="true">Night</button>
+              <button data-theme-btn="day" aria-pressed="false">Day</button>
+              <button data-theme-btn="contrast" aria-pressed="false">Contrast</button>
+            </span>
           </span>
         </div>
       </header>
