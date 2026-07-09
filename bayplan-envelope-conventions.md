@@ -53,7 +53,7 @@ The wood lathe's outboard swing, for example, is an arc centered at the headstoc
 
 ### minHeight
 
-`minHeight` is the height a zone needs to be clear up to. A value of `null` means full height (floor to head). A numeric value means the zone only needs clearing to that height, so a low cabinet or a neighbor's base can sit under a feed lane but never under an operator zone. This is what lets a table saw's outfeed lane pass over a short storage unit while an operator stance cannot.
+`minHeight` is the floor height of the underside of a zone's protected band. The zone requires clearance from `minHeight` up to the ceiling; a value of `null` means the band starts at the floor (full height). So an obstruction shorter than a zone's `minHeight` passes harmlessly under it, while anything taller intrudes. This is what lets a table saw's outfeed lane pass over a short storage unit (its `minHeight` sits near deck height) while an operator stance, with a `null` `minHeight`, is protected floor to ceiling and tolerates nothing beneath it. A machine body occupies the band from the floor to its own `height`, so TRIM flags a body-in-zone conflict only when the body is taller than the zone's `minHeight`.
 
 ---
 
@@ -73,7 +73,7 @@ The wood lathe's outboard swing, for example, is an arc centered at the headstoc
 
 ### Why feed lanes are shared, not hard
 
-A table saw's outfeed genuinely wants to overlap the jointer's operator walk space, or an aisle, or another machine's low base. Marking feed lanes `shared` lets two feed zones (or a feed zone and an aisle) coexist without a false conflict, while a `shared` lane hitting a `hard` zone (someone's blade danger zone, a lathe swing) still errors. The `minHeight` on a feed lane reinforces this: the lane only needs clearing to stock height, so it can pass over low obstructions.
+A table saw's outfeed genuinely wants to overlap the jointer's operator walk space, or an aisle, or another machine's low base. Marking feed lanes `shared` lets two feed zones (or a feed zone and an aisle) coexist without a false conflict, while a `shared` lane hitting a `hard` zone (someone's blade danger zone, a lathe swing) still errors. The `minHeight` on a feed lane reinforces this in the vertical dimension: the lane's protected band sits above deck height, so a machine body shorter than that height passes under it without a flag.
 
 ### Why operator zones are soft
 
@@ -172,6 +172,25 @@ These are rule-of-thumb ceilings for typical single-stage and cyclone collectors
 ### Electrical rollup
 
 Each machine carries a `PowerReq` (voltage, amps, phase, dedicated). When a panel exists, SERVICES rolls up connected load into a 120V bucket and a 240V bucket. Two checks apply: a machine that needs 240V when no panel supplies it is an error, and connected load past eighty percent of the largest panel's main is a warning. For the load-versus-main comparison, 120V loads are counted at half their amperage, since two 120V circuits share a 240V main. Panel defaults are a 240V service at 100A main with 20 spaces; these are editable per node.
+
+---
+
+## 7. PLAT title-block fields
+
+This section pins the fields on an issued plat, closing the last open item from section 13 of the data-model spec. The printable sheet renders on a white ground regardless of the on-screen theme, and carries a title block, a scale bar, a north arrow, and a legend.
+
+Title-block fields:
+
+- **Project**: the document title (`meta.title`).
+- **Facility**: the room name (`facility.name`).
+- **Scale**: the drawing scale, presently one inch to one inch (the plat is drawn true to size in inches).
+- **Revision**: `meta.revision`, defaulting to A.
+- **Date**: `meta.date`, stamped with the current date at print time if unset.
+- **Drawn**: `meta.author`, defaulting to M.B. Parks.
+- **Sheet**: the scenario name being issued.
+- **Instrument mark**: BAYPLAN FI-075.
+
+Supporting marks: a north arrow keyed to plan north, a scale bar showing a known two-foot length for reference when the sheet is resized on paper, and a legend covering the hard, soft, and shared clearances plus the dust and electrical run styles.
 
 ---
 

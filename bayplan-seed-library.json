@@ -72,7 +72,7 @@
           "label": "infeed",
           "severity": "shared",
           "minHeight": 40,
-          "note": "8ft infeed to rip full sheets; clear only to table height"
+          "note": "8ft infeed to rip full sheets; protected above deck height; low units pass under"
         },
         {
           "shape": "rect",

@@ -91,7 +91,7 @@ M.append(machine(
     power(240, 15, 1, True), dust([0, -6], 4),
     [
         zone(rect("front", 96), "infeed", "shared", 40,
-             "8ft infeed to rip full sheets; clear only to table height"),
+             "8ft infeed to rip full sheets; protected above deck height; low units pass under"),
         zone(rect("back", 96), "outfeed", "shared", 40,
              "8ft outfeed for ripped stock; overlaps aisles by design"),
         zone(rect("front", 36), "operator", "soft", None,

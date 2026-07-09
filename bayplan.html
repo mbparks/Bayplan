@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.4 | build-marker: services-2026-07-08 -->
+<!-- BAYPLAN FI-075 | v0.0.7 | build-marker: sounding-2026-07-08 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -110,21 +110,40 @@
   #tests table{border-collapse:collapse; width:100%}
   #tests td{padding:3px 8px; border-bottom:1px solid var(--line); vertical-align:top}
   @media (max-width:760px){ aside{width:246px} }
+  /* PLAT: compare + print */
+  #compare{padding:18px 22px; overflow:auto; height:100%}
+  #compare h1{font-family:var(--font-mono); font-size:15px; letter-spacing:.08em; margin:0 0 4px}
+  #compare .pair{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:12px 0}
+  #compare .col h3{font-family:var(--font-mono); font-size:12px; letter-spacing:.1em; margin:0 0 6px; color:var(--brass)}
+  #compare .plat{border:1px solid var(--line); background:var(--panel); border-radius:2px}
+  #compare .plat svg{width:100%; height:auto; display:block}
+  #compare table{border-collapse:collapse; width:100%; font-family:var(--font-mono); font-size:12px; margin-top:8px}
+  #compare td,#compare th{padding:5px 9px; border-bottom:1px solid var(--line); text-align:left}
+  #compare th{color:var(--ink-dim); font-weight:600; letter-spacing:.06em}
+  #compare .delta-add{color:var(--shared)} #compare .delta-rem{color:var(--hard)} #compare .delta-mov{color:var(--soft)}
+  #printSheet{display:none}
+  @media print{
+    header,footer,aside,.stage,#tests,#compare{display:none !important}
+    body{height:auto; overflow:visible; background:#fff}
+    #printSheet{display:block; width:100%}
+    #printSheet svg{width:100%; height:auto}
+  }
 </style>
 </head>
 <body>
 <div id="app" style="display:contents"></div>
+<div id="printSheet" aria-hidden="true"></div>
 
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.4  (SERVICES: utilities graph)
+   BAYPLAN FI-075  v0.0.7  (SOUNDING: walls + features)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
    ============================================================ */
 
-const SEED = {"schemaVersion":"1.0.0","kind":"bayplan-seed-library","generated":"2026-07-08","frame":{"units":"inches","origin":"anchor","axes":"+x operator-right, +y back (away from operator)","edges":"front=min y, back=max y, left=min x, right=max x","arcAngles":"degrees clockwise from +y (back): 0=back,90=right,180=front,270=left","note":"Defaults for tuning. minHeight null means full height (floor to head)."},"library":[{"id":"builtin-table-saw-cabinet","name":"Table saw (3HP cabinet, 36in fence)","category":"table_saw","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-14,-13],[30,-13],[30,14],[-14,14]]},"anchor":[0,0],"anchorNote":"blade, at kerf line","height":34,"weight":500,"power":{"voltage":240,"amps":15,"phase":1,"dedicated":true},"dustPort":{"position":[0,-6],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":96},"label":"infeed","severity":"shared","minHeight":40,"note":"8ft infeed to rip full sheets; clear only to table height"},{"shape":"rect","geometry":{"edge":"back","depth":96},"label":"outfeed","severity":"shared","minHeight":40,"note":"8ft outfeed for ripped stock; overlaps aisles by design"},{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"operator","severity":"soft","minHeight":null,"note":"operator stance at the front, full height"},{"shape":"rect","geometry":{"edge":"right","depth":40},"label":"blade_access","severity":"soft","minHeight":40,"note":"36in rip capacity to the right of the blade"}],"ports":[{"id":"in","label":"stock_in","position":[0,-13]},{"id":"out","label":"stock_out","position":[0,14]}]},{"id":"builtin-jointer-8in","name":"Jointer (8in, long bed)","category":"jointer","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-36.0,-11.0],[36.0,-11.0],[36.0,11.0],[-36.0,11.0]]},"anchor":[0,0],"anchorNote":"cutterhead, bed center","height":34,"weight":450,"power":{"voltage":240,"amps":12,"phase":1,"dedicated":false},"dustPort":{"position":[0,8],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":72},"label":"infeed","severity":"shared","minHeight":38,"note":"long-board infeed along the bed axis"},{"shape":"rect","geometry":{"edge":"right","depth":72},"label":"outfeed","severity":"shared","minHeight":38,"note":"long-board outfeed along the bed axis"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator works along the front of the bed"}],"ports":[{"id":"in","label":"stock_in","position":[-36,0]},{"id":"out","label":"stock_out","position":[36,0]}]},{"id":"builtin-planer-13in","name":"Thickness planer (13in benchtop on stand)","category":"planer","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-11.0],[12.0,-11.0],[12.0,11.0],[-12.0,11.0]]},"anchor":[0,0],"anchorNote":"cutterhead center","height":38,"weight":90,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,10],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":96},"label":"infeed","severity":"shared","minHeight":42,"note":"long-board infeed; feeds front to back"},{"shape":"rect","geometry":{"edge":"back","depth":96},"label":"outfeed","severity":"shared","minHeight":42,"note":"long-board outfeed"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at infeed"}],"ports":[{"id":"in","label":"stock_in","position":[0,-11]},{"id":"out","label":"stock_out","position":[0,11]}]},{"id":"builtin-bandsaw-14in","name":"Bandsaw (14in)","category":"bandsaw","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-13.0,-15.0],[13.0,-15.0],[13.0,15.0],[-13.0,15.0]]},"anchor":[0,0],"anchorNote":"blade at table slot","height":43,"weight":250,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,6],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":72},"label":"infeed","severity":"shared","minHeight":46,"note":"resaw infeed for long stock"},{"shape":"rect","geometry":{"edge":"back","depth":72},"label":"outfeed","severity":"shared","minHeight":46,"note":"resaw outfeed"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the front of the table"},{"shape":"rect","geometry":{"edge":"front","depth":8},"label":"blade_access","severity":"hard","minHeight":null,"note":"immediate blade danger zone, keep clear"}],"ports":[{"id":"in","label":"stock_in","position":[0,-15]},{"id":"out","label":"stock_out","position":[0,15]}]},{"id":"builtin-miter-saw","name":"Miter saw (compound, station)","category":"miter_saw","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-10.0],[12.0,-10.0],[12.0,10.0],[-12.0,10.0]]},"anchor":[0,0],"anchorNote":"blade at fence intersection","height":36,"weight":55,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,8],"diameter":2.5},"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":96},"label":"infeed","severity":"shared","minHeight":40,"note":"long-trim support to the left; 8ft ideal"},{"shape":"rect","geometry":{"edge":"right","depth":96},"label":"outfeed","severity":"shared","minHeight":40,"note":"long-trim support to the right"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the front"}],"ports":[{"id":"in","label":"stock_in","position":[-12,0]},{"id":"out","label":"stock_out","position":[12,0]}]},{"id":"builtin-drill-press","name":"Drill press (floor standing)","category":"drill_press","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-10.0,-12.0],[10.0,-12.0],[10.0,12.0],[-10.0,12.0]]},"anchor":[0,0],"anchorNote":"spindle / chuck axis","height":66,"weight":200,"power":{"voltage":120,"amps":12,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the front"},{"shape":"rect","geometry":{"edge":"left","depth":36},"label":"loading","severity":"soft","minHeight":null,"note":"long-work overhang support, left"},{"shape":"rect","geometry":{"edge":"right","depth":36},"label":"loading","severity":"soft","minHeight":null,"note":"long-work overhang support, right"}],"ports":[]},{"id":"builtin-wood-lathe","name":"Wood lathe (with outboard turning)","category":"lathe","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-6,-9],[42,-9],[42,9],[-6,9]]},"anchor":[0,0],"anchorNote":"headstock spindle","height":44,"weight":220,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"turner stands along the front of the bed"},{"shape":"rect","geometry":{"edge":"right","depth":24},"label":"end_clearance","severity":"soft","minHeight":44,"note":"tailstock end, room for long spindle stock"},{"shape":"arc","geometry":{"center":[0,0],"radius":20,"startAngle":180,"sweep":90},"label":"swing","severity":"hard","minHeight":null,"note":"outboard bowl swing off the headstock, front-left arc"}],"ports":[]},{"id":"builtin-metal-lathe","name":"Metal lathe (benchtop)","category":"metal_lathe","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-3,-7],[27,-7],[27,7],[-3,7]]},"anchor":[0,0],"anchorNote":"spindle / chuck","height":16,"weight":300,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":24},"label":"end_clearance","severity":"hard","minHeight":null,"note":"bar stock protruding through the spindle bore"},{"shape":"rect","geometry":{"edge":"right","depth":18},"label":"end_clearance","severity":"soft","minHeight":null,"note":"tailstock end for long work"},{"shape":"rect","geometry":{"edge":"front","depth":24},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the carriage"}],"ports":[]},{"id":"builtin-mill-benchtop","name":"Milling machine (benchtop)","category":"mill","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-10.0],[12.0,-10.0],[12.0,10.0],[-12.0,10.0]]},"anchor":[0,0],"anchorNote":"spindle axis","height":32,"weight":350,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":16},"label":"service","severity":"soft","minHeight":null,"note":"X-table travel overhang, left"},{"shape":"rect","geometry":{"edge":"right","depth":16},"label":"service","severity":"soft","minHeight":null,"note":"X-table travel overhang, right"},{"shape":"rect","geometry":{"edge":"front","depth":24},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the handwheels"}],"ports":[]},{"id":"builtin-cnc-router-4x4","name":"CNC router (4x4 bed)","category":"cnc_router","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-30.0,-30.0],[30.0,-30.0],[30.0,30.0],[-30.0,30.0]]},"anchor":[0,0],"anchorNote":"spoilboard center","height":48,"weight":400,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,0],"diameter":2.5},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":48},"label":"loading","severity":"shared","minHeight":null,"note":"material load and unload from the front"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator and pendant at the front"},{"shape":"rect","geometry":{"edge":"back","depth":18},"label":"service","severity":"soft","minHeight":null,"note":"rear access for wiring and gantry service"},{"shape":"rect","geometry":{"edge":"left","depth":18},"label":"service","severity":"soft","minHeight":null,"note":"side access for bit changes"},{"shape":"rect","geometry":{"edge":"right","depth":18},"label":"service","severity":"soft","minHeight":null,"note":"side access for bit changes"}],"ports":[{"id":"in","label":"stock_in","position":[0,-30]}]},{"id":"builtin-welding-table","name":"Welding table (with MIG)","category":"welding","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-15.0,-30.0],[15.0,-30.0],[15.0,30.0],[-15.0,30.0]]},"anchor":[0,0],"anchorNote":"table center","height":34,"weight":350,"power":{"voltage":240,"amps":50,"phase":1,"dedicated":true},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":48},"label":"service","severity":"hard","minHeight":null,"note":"spark and slag spray zone, keep combustibles clear"},{"shape":"rect","geometry":{"edge":"left","depth":24},"label":"service","severity":"hard","minHeight":null,"note":"spark standoff, left"},{"shape":"rect","geometry":{"edge":"right","depth":24},"label":"service","severity":"hard","minHeight":null,"note":"spark standoff, right"},{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"operator","severity":"soft","minHeight":null,"note":"welder position, overlaps the spark zone"}],"ports":[]},{"id":"builtin-bench-grinder","name":"Bench grinder (pedestal)","category":"grinder","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-8.0,-7.0],[8.0,-7.0],[8.0,7.0],[-8.0,7.0]]},"anchor":[0,0],"anchorNote":"between the wheels","height":44,"weight":60,"power":{"voltage":120,"amps":12,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"service","severity":"hard","minHeight":null,"note":"spark cone projecting forward from the wheels"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the tool rests"}],"ports":[]},{"id":"builtin-assembly-table","name":"Assembly table (4x8)","category":"assembly","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-24.0,-48.0],[24.0,-48.0],[24.0,48.0],[-24.0,48.0]]},"anchor":[0,0],"anchorNote":"table center","height":34,"weight":300,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron; shares space with aisles and neighbor outfeed"},{"shape":"rect","geometry":{"edge":"back","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron, far side"},{"shape":"rect","geometry":{"edge":"left","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron, left"},{"shape":"rect","geometry":{"edge":"right","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron, right"}],"ports":[]},{"id":"builtin-workbench","name":"Workbench (with front and end vise)","category":"bench","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-36.0],[12.0,-36.0],[12.0,36.0],[-12.0,36.0]]},"anchor":[0,0],"anchorNote":"bench center","height":34,"weight":250,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"operator","severity":"soft","minHeight":null,"note":"primary working side at the front vise"},{"shape":"rect","geometry":{"edge":"right","depth":24},"label":"operator","severity":"soft","minHeight":null,"note":"end-vise work clearance"}],"ports":[]},{"id":"builtin-dust-collector","name":"Dust collector (2HP cyclone)","category":"dust_collector","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-15.0,-20.0],[15.0,-20.0],[15.0,20.0],[-15.0,20.0]]},"anchor":[0,0],"anchorNote":"inlet center","height":78,"weight":200,"power":{"voltage":240,"amps":12,"phase":1,"dedicated":true},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"service","severity":"soft","minHeight":null,"note":"bin and filter service access"}],"ports":[]},{"id":"builtin-air-compressor","name":"Air compressor (vertical 60gal)","category":"compressor","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-13.0],[12.0,-13.0],[12.0,13.0],[-12.0,13.0]]},"anchor":[0,0],"anchorNote":"tank center","height":68,"weight":250,"power":{"voltage":240,"amps":15,"phase":1,"dedicated":true},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":24},"label":"service","severity":"soft","minHeight":null,"note":"drain, regulator, and pump access"},{"shape":"rect","geometry":{"edge":"back","depth":12},"label":"service","severity":"soft","minHeight":null,"note":"cooling and heat clearance behind the pump"}],"ports":[]},{"id":"builtin-electronics-bench","name":"Electronics bench (ESD)","category":"electronics","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-15.0,-30.0],[15.0,-30.0],[15.0,30.0],[-15.0,30.0]]},"anchor":[0,0],"anchorNote":"bench center","height":34,"weight":200,"power":{"voltage":120,"amps":20,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"seated operator, chair plus reach"}],"ports":[]}]};
+const SEED = {"schemaVersion":"1.0.0","kind":"bayplan-seed-library","generated":"2026-07-08","frame":{"units":"inches","origin":"anchor","axes":"+x operator-right, +y back (away from operator)","edges":"front=min y, back=max y, left=min x, right=max x","arcAngles":"degrees clockwise from +y (back): 0=back,90=right,180=front,270=left","note":"Defaults for tuning. minHeight null means full height (floor to head)."},"library":[{"id":"builtin-table-saw-cabinet","name":"Table saw (3HP cabinet, 36in fence)","category":"table_saw","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-14,-13],[30,-13],[30,14],[-14,14]]},"anchor":[0,0],"anchorNote":"blade, at kerf line","height":34,"weight":500,"power":{"voltage":240,"amps":15,"phase":1,"dedicated":true},"dustPort":{"position":[0,-6],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":96},"label":"infeed","severity":"shared","minHeight":40,"note":"8ft infeed to rip full sheets; protected above deck height; low units pass under"},{"shape":"rect","geometry":{"edge":"back","depth":96},"label":"outfeed","severity":"shared","minHeight":40,"note":"8ft outfeed for ripped stock; overlaps aisles by design"},{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"operator","severity":"soft","minHeight":null,"note":"operator stance at the front, full height"},{"shape":"rect","geometry":{"edge":"right","depth":40},"label":"blade_access","severity":"soft","minHeight":40,"note":"36in rip capacity to the right of the blade"}],"ports":[{"id":"in","label":"stock_in","position":[0,-13]},{"id":"out","label":"stock_out","position":[0,14]}]},{"id":"builtin-jointer-8in","name":"Jointer (8in, long bed)","category":"jointer","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-36.0,-11.0],[36.0,-11.0],[36.0,11.0],[-36.0,11.0]]},"anchor":[0,0],"anchorNote":"cutterhead, bed center","height":34,"weight":450,"power":{"voltage":240,"amps":12,"phase":1,"dedicated":false},"dustPort":{"position":[0,8],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":72},"label":"infeed","severity":"shared","minHeight":38,"note":"long-board infeed along the bed axis"},{"shape":"rect","geometry":{"edge":"right","depth":72},"label":"outfeed","severity":"shared","minHeight":38,"note":"long-board outfeed along the bed axis"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator works along the front of the bed"}],"ports":[{"id":"in","label":"stock_in","position":[-36,0]},{"id":"out","label":"stock_out","position":[36,0]}]},{"id":"builtin-planer-13in","name":"Thickness planer (13in benchtop on stand)","category":"planer","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-11.0],[12.0,-11.0],[12.0,11.0],[-12.0,11.0]]},"anchor":[0,0],"anchorNote":"cutterhead center","height":38,"weight":90,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,10],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":96},"label":"infeed","severity":"shared","minHeight":42,"note":"long-board infeed; feeds front to back"},{"shape":"rect","geometry":{"edge":"back","depth":96},"label":"outfeed","severity":"shared","minHeight":42,"note":"long-board outfeed"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at infeed"}],"ports":[{"id":"in","label":"stock_in","position":[0,-11]},{"id":"out","label":"stock_out","position":[0,11]}]},{"id":"builtin-bandsaw-14in","name":"Bandsaw (14in)","category":"bandsaw","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-13.0,-15.0],[13.0,-15.0],[13.0,15.0],[-13.0,15.0]]},"anchor":[0,0],"anchorNote":"blade at table slot","height":43,"weight":250,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,6],"diameter":4},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":72},"label":"infeed","severity":"shared","minHeight":46,"note":"resaw infeed for long stock"},{"shape":"rect","geometry":{"edge":"back","depth":72},"label":"outfeed","severity":"shared","minHeight":46,"note":"resaw outfeed"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the front of the table"},{"shape":"rect","geometry":{"edge":"front","depth":8},"label":"blade_access","severity":"hard","minHeight":null,"note":"immediate blade danger zone, keep clear"}],"ports":[{"id":"in","label":"stock_in","position":[0,-15]},{"id":"out","label":"stock_out","position":[0,15]}]},{"id":"builtin-miter-saw","name":"Miter saw (compound, station)","category":"miter_saw","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-10.0],[12.0,-10.0],[12.0,10.0],[-12.0,10.0]]},"anchor":[0,0],"anchorNote":"blade at fence intersection","height":36,"weight":55,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,8],"diameter":2.5},"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":96},"label":"infeed","severity":"shared","minHeight":40,"note":"long-trim support to the left; 8ft ideal"},{"shape":"rect","geometry":{"edge":"right","depth":96},"label":"outfeed","severity":"shared","minHeight":40,"note":"long-trim support to the right"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the front"}],"ports":[{"id":"in","label":"stock_in","position":[-12,0]},{"id":"out","label":"stock_out","position":[12,0]}]},{"id":"builtin-drill-press","name":"Drill press (floor standing)","category":"drill_press","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-10.0,-12.0],[10.0,-12.0],[10.0,12.0],[-10.0,12.0]]},"anchor":[0,0],"anchorNote":"spindle / chuck axis","height":66,"weight":200,"power":{"voltage":120,"amps":12,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the front"},{"shape":"rect","geometry":{"edge":"left","depth":36},"label":"loading","severity":"soft","minHeight":null,"note":"long-work overhang support, left"},{"shape":"rect","geometry":{"edge":"right","depth":36},"label":"loading","severity":"soft","minHeight":null,"note":"long-work overhang support, right"}],"ports":[]},{"id":"builtin-wood-lathe","name":"Wood lathe (with outboard turning)","category":"lathe","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-6,-9],[42,-9],[42,9],[-6,9]]},"anchor":[0,0],"anchorNote":"headstock spindle","height":44,"weight":220,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"turner stands along the front of the bed"},{"shape":"rect","geometry":{"edge":"right","depth":24},"label":"end_clearance","severity":"soft","minHeight":44,"note":"tailstock end, room for long spindle stock"},{"shape":"arc","geometry":{"center":[0,0],"radius":20,"startAngle":180,"sweep":90},"label":"swing","severity":"hard","minHeight":null,"note":"outboard bowl swing off the headstock, front-left arc"}],"ports":[]},{"id":"builtin-metal-lathe","name":"Metal lathe (benchtop)","category":"metal_lathe","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-3,-7],[27,-7],[27,7],[-3,7]]},"anchor":[0,0],"anchorNote":"spindle / chuck","height":16,"weight":300,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":24},"label":"end_clearance","severity":"hard","minHeight":null,"note":"bar stock protruding through the spindle bore"},{"shape":"rect","geometry":{"edge":"right","depth":18},"label":"end_clearance","severity":"soft","minHeight":null,"note":"tailstock end for long work"},{"shape":"rect","geometry":{"edge":"front","depth":24},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the carriage"}],"ports":[]},{"id":"builtin-mill-benchtop","name":"Milling machine (benchtop)","category":"mill","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-10.0],[12.0,-10.0],[12.0,10.0],[-12.0,10.0]]},"anchor":[0,0],"anchorNote":"spindle axis","height":32,"weight":350,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"left","depth":16},"label":"service","severity":"soft","minHeight":null,"note":"X-table travel overhang, left"},{"shape":"rect","geometry":{"edge":"right","depth":16},"label":"service","severity":"soft","minHeight":null,"note":"X-table travel overhang, right"},{"shape":"rect","geometry":{"edge":"front","depth":24},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the handwheels"}],"ports":[]},{"id":"builtin-cnc-router-4x4","name":"CNC router (4x4 bed)","category":"cnc_router","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-30.0,-30.0],[30.0,-30.0],[30.0,30.0],[-30.0,30.0]]},"anchor":[0,0],"anchorNote":"spoilboard center","height":48,"weight":400,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":{"position":[0,0],"diameter":2.5},"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":48},"label":"loading","severity":"shared","minHeight":null,"note":"material load and unload from the front"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator and pendant at the front"},{"shape":"rect","geometry":{"edge":"back","depth":18},"label":"service","severity":"soft","minHeight":null,"note":"rear access for wiring and gantry service"},{"shape":"rect","geometry":{"edge":"left","depth":18},"label":"service","severity":"soft","minHeight":null,"note":"side access for bit changes"},{"shape":"rect","geometry":{"edge":"right","depth":18},"label":"service","severity":"soft","minHeight":null,"note":"side access for bit changes"}],"ports":[{"id":"in","label":"stock_in","position":[0,-30]}]},{"id":"builtin-welding-table","name":"Welding table (with MIG)","category":"welding","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-15.0,-30.0],[15.0,-30.0],[15.0,30.0],[-15.0,30.0]]},"anchor":[0,0],"anchorNote":"table center","height":34,"weight":350,"power":{"voltage":240,"amps":50,"phase":1,"dedicated":true},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":48},"label":"service","severity":"hard","minHeight":null,"note":"spark and slag spray zone, keep combustibles clear"},{"shape":"rect","geometry":{"edge":"left","depth":24},"label":"service","severity":"hard","minHeight":null,"note":"spark standoff, left"},{"shape":"rect","geometry":{"edge":"right","depth":24},"label":"service","severity":"hard","minHeight":null,"note":"spark standoff, right"},{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"operator","severity":"soft","minHeight":null,"note":"welder position, overlaps the spark zone"}],"ports":[]},{"id":"builtin-bench-grinder","name":"Bench grinder (pedestal)","category":"grinder","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-8.0,-7.0],[8.0,-7.0],[8.0,7.0],[-8.0,7.0]]},"anchor":[0,0],"anchorNote":"between the wheels","height":44,"weight":60,"power":{"voltage":120,"amps":12,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"service","severity":"hard","minHeight":null,"note":"spark cone projecting forward from the wheels"},{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"operator at the tool rests"}],"ports":[]},{"id":"builtin-assembly-table","name":"Assembly table (4x8)","category":"assembly","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-24.0,-48.0],[24.0,-48.0],[24.0,48.0],[-24.0,48.0]]},"anchor":[0,0],"anchorNote":"table center","height":34,"weight":300,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron; shares space with aisles and neighbor outfeed"},{"shape":"rect","geometry":{"edge":"back","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron, far side"},{"shape":"rect","geometry":{"edge":"left","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron, left"},{"shape":"rect","geometry":{"edge":"right","depth":30},"label":"operator","severity":"shared","minHeight":null,"note":"work apron, right"}],"ports":[]},{"id":"builtin-workbench","name":"Workbench (with front and end vise)","category":"bench","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-36.0],[12.0,-36.0],[12.0,36.0],[-12.0,36.0]]},"anchor":[0,0],"anchorNote":"bench center","height":34,"weight":250,"power":{"voltage":120,"amps":15,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":36},"label":"operator","severity":"soft","minHeight":null,"note":"primary working side at the front vise"},{"shape":"rect","geometry":{"edge":"right","depth":24},"label":"operator","severity":"soft","minHeight":null,"note":"end-vise work clearance"}],"ports":[]},{"id":"builtin-dust-collector","name":"Dust collector (2HP cyclone)","category":"dust_collector","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-15.0,-20.0],[15.0,-20.0],[15.0,20.0],[-15.0,20.0]]},"anchor":[0,0],"anchorNote":"inlet center","height":78,"weight":200,"power":{"voltage":240,"amps":12,"phase":1,"dedicated":true},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"service","severity":"soft","minHeight":null,"note":"bin and filter service access"}],"ports":[]},{"id":"builtin-air-compressor","name":"Air compressor (vertical 60gal)","category":"compressor","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-12.0,-13.0],[12.0,-13.0],[12.0,13.0],[-12.0,13.0]]},"anchor":[0,0],"anchorNote":"tank center","height":68,"weight":250,"power":{"voltage":240,"amps":15,"phase":1,"dedicated":true},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":24},"label":"service","severity":"soft","minHeight":null,"note":"drain, regulator, and pump access"},{"shape":"rect","geometry":{"edge":"back","depth":12},"label":"service","severity":"soft","minHeight":null,"note":"cooling and heat clearance behind the pump"}],"ports":[]},{"id":"builtin-electronics-bench","name":"Electronics bench (ESD)","category":"electronics","provenance":{"source":"builtin","qmAssetId":null,"seededFields":[],"seededAt":null,"localEdits":[]},"footprint":{"vertices":[[-15.0,-30.0],[15.0,-30.0],[15.0,30.0],[-15.0,30.0]]},"anchor":[0,0],"anchorNote":"bench center","height":34,"weight":200,"power":{"voltage":120,"amps":20,"phase":1,"dedicated":false},"dustPort":null,"clearances":[{"shape":"rect","geometry":{"edge":"front","depth":30},"label":"operator","severity":"soft","minHeight":null,"note":"seated operator, chair plus reach"}],"ports":[]}]};
 
 /* ---- geometry core ---- */
 const G = {
@@ -175,6 +194,22 @@ const G = {
   footprintWorldPoly(def,pl){return def.footprint.vertices.map(p=>this.toWorld(p,pl));}
 };
 
+/* ---- facility feature geometry (columns, doors, windows) ---- */
+const Feat = {
+  columnPoly(f){const[x,y]=f.position,[w,h]=f.size; const hw=w/2,hh=h/2;
+    return [[x-hw,y-hh],[x+hw,y-hh],[x+hw,y+hh],[x-hw,y+hh]];},
+  doorArc(f){return {center:f.position.slice(),radius:f.width,startAngle:f.swingStart||0,sweep:f.swingSweep||90};},
+  doorSwingPoly(f){const a=this.doorArc(f); const pts=[]; const step=10;
+    for(let d=0;d<=a.sweep+1e-6;d+=step){const b=(a.startAngle+d)*Math.PI/180;
+      pts.push([a.center[0]+a.radius*Math.sin(b),a.center[1]+a.radius*Math.cos(b)]);}
+    pts.push(a.center.slice()); return pts;},
+  doorLeafEnd(f){const a=this.doorArc(f); const b=(a.startAngle)*Math.PI/180;
+    return [a.center[0]+a.radius*Math.sin(b),a.center[1]+a.radius*Math.cos(b)];},
+  windowSeg(f){const[x,y]=f.position; const ang=((f.facing||0)+90)*Math.PI/180; // segment lies along the wall
+    const hw=f.width/2, dx=Math.sin(ang)*hw, dy=Math.cos(ang)*hw;
+    return [[x-dx,y-dy],[x+dx,y+dy]];}
+};
+
 /* ---- TRIM: conflict severity matrix + checker ---- */
 const Trim = {
   interaction(a,b){
@@ -193,29 +228,46 @@ const Trim = {
     };
     return M[k]||"ok";
   },
-  regions(pl){
+  // each region carries a vertical band [lo,hi]: a machine body is floor-to-height;
+  // a clearance zone is protected from its minHeight up to the ceiling (null minHeight = floor).
+  regions(pl,ceiling){
     const def=Model.def(pl.defId); if(!def) return [];
-    const out=[{kind:"footprint",label:"body",poly:G.footprintWorldPoly(def,pl)}];
+    const bodyHi = (def.height!=null)?def.height:Infinity;
+    const out=[{kind:"footprint",label:"body",poly:G.footprintWorldPoly(def,pl),lo:0,hi:bodyHi}];
     for(const z of def.clearances)
-      out.push({kind:z.severity,label:z.label,poly:G.zoneWorldPoly(z,def,pl)});
+      out.push({kind:z.severity,label:z.label,poly:G.zoneWorldPoly(z,def,pl),
+        lo:(z.minHeight!=null?z.minHeight:0), hi:ceiling});
+    return out;
+  },
+  vOverlap(a,b){return a.lo < b.hi - 1e-9 && b.lo < a.hi - 1e-9;},
+  featureRegions(doc,ceiling){
+    const out=[];
+    for(const f of (doc.facility.features||[])){
+      if(f.kind==="column") out.push({kind:"footprint",label:"column",
+        poly:Feat.columnPoly(f),lo:0,hi:(f.height!=null?f.height:ceiling),fid:f.id,fname:"column"});
+      else if(f.kind==="door") out.push({kind:"hard",label:"door swing",
+        poly:Feat.doorSwingPoly(f),lo:0,hi:ceiling,fid:f.id,fname:"door swing"});
+      // windows do not constrain placement
+    }
     return out;
   },
   rank(s){return s==="error"?2:s==="warning"?1:0;},
   compute(doc){
     const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
+    const ceiling=(doc.facility.ceilingHeight!=null?doc.facility.ceilingHeight:108);
     const pls=sc.placements, recs=[], worst={};
     const bump=(id,s)=>{ if(this.rank(s)>this.rank(worst[id]||"ok")) worst[id]=s; };
     for(let i=0;i<pls.length;i++){
-      const rgA=this.regions(pls[i]); const dA=Model.def(pls[i].defId);
+      const rgA=this.regions(pls[i],ceiling); const dA=Model.def(pls[i].defId);
       const nameA=pls[i].label||(dA&&dA.name)||"?";
       for(let j=i+1;j<pls.length;j++){
-        const rgB=this.regions(pls[j]); const dB=Model.def(pls[j].defId);
+        const rgB=this.regions(pls[j],ceiling); const dB=Model.def(pls[j].defId);
         const nameB=pls[j].label||(dB&&dB.name)||"?";
         let pairWorst="ok", detail=null;
         for(const ra of rgA) for(const rb of rgB){
           const sev=this.interaction(ra.kind,rb.kind);
           if(sev==="ok") continue;
-          if(this.rank(sev)>this.rank(pairWorst) && G.polysOverlap(ra.poly,rb.poly)){
+          if(this.rank(sev)>this.rank(pairWorst) && this.vOverlap(ra,rb) && G.polysOverlap(ra.poly,rb.poly)){
             pairWorst=sev; detail={la:ra.label,lb:rb.label};
           }
         }
@@ -236,6 +288,23 @@ const Trim = {
         bump(pl.id,"error");
       }
     }
+    // features: columns (solid) and door swings (hard) constrain placement
+    const feats=this.featureRegions(doc,ceiling);
+    for(const pl of pls){
+      const def=Model.def(pl.defId); if(!def) continue;
+      const rg=this.regions(pl,ceiling); const nm=pl.label||def.name;
+      const perFeature={};
+      for(const ra of rg) for(const fr of feats){
+        const sev=this.interaction(ra.kind,fr.kind);
+        if(sev==="ok") continue;
+        if(this.rank(sev)>this.rank(perFeature[fr.fid]?.sev||"ok") && this.vOverlap(ra,fr) && G.polysOverlap(ra.poly,fr.poly))
+          perFeature[fr.fid]={sev,la:ra.label,fname:fr.fname};
+      }
+      for(const fid in perFeature){const p=perFeature[fid];
+        recs.push({sev:p.sev,a:pl.id,b:fid,text:`${nm} ${p.la} \u00d7 ${p.fname}`});
+        bump(pl.id,p.sev);
+      }
+    }
     const errors=recs.filter(r=>r.sev==="error").length;
     const warnings=recs.filter(r=>r.sev==="warning").length;
     return {records:recs,worst,errors,warnings};
@@ -249,12 +318,21 @@ const Model = {
   _seq:100,
   newId(){return "p"+(++this._seq);},
   emptyFacility(){return {schemaVersion:"1.0.0",
-    meta:{title:"Untitled",units:"imperial",gridSpacing:12},
+    meta:{title:"Untitled",units:"imperial",gridSpacing:12,revision:"A",author:"M.B. Parks",date:null},
     facility:{id:"f1",name:"Shop",boundary:{vertices:[[0,0],[288,0],[288,216],[0,216]]},
       ceilingHeight:108,northOffset:0,features:[]},
     library:SEED.library,
     scenarios:[{id:"s1",name:"Current",placements:[],utilityNodes:[],utilityRuns:[],flows:[],notes:""}],
     activeScenarioId:"s1"};},
+  _sseq:1, newScenarioId(){return "s"+(++this._sseq);},
+  duplicateScenario(doc){const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
+    const clone=JSON.parse(JSON.stringify(sc)); // placement ids kept for compare matching
+    clone.id=this.newScenarioId(); clone.name=sc.name==="Current"?"Proposed":sc.name+" copy";
+    doc.scenarios.push(clone); doc.activeScenarioId=clone.id; return clone;},
+  setActiveScenario(doc,id){if(doc.scenarios.some(s=>s.id===id))doc.activeScenarioId=id;},
+  removeScenario(doc,id){if(doc.scenarios.length<=1)return;
+    doc.scenarios=doc.scenarios.filter(s=>s.id!==id);
+    if(doc.activeScenarioId===id)doc.activeScenarioId=doc.scenarios[0].id;},
   demo(){const d=this.emptyFacility(); d.meta.title="Demo shop"; d.facility.name="Two-bay shop";
     d.scenarios[0].placements=[
       {id:"p1",defId:"builtin-table-saw-cabinet",position:[96,120],rotation:0,mirrored:false,label:"Table saw"},
@@ -288,6 +366,25 @@ const Model = {
   removeNode(doc,id){const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
     sc.utilityNodes=sc.utilityNodes.filter(n=>n.id!==id);
     sc.utilityRuns=sc.utilityRuns.filter(r=>r.fromNode!==id);},
+  // SOUNDING: boundary + features (features live on the shared facility)
+  setFacilityRect(doc,w,h){w=Math.max(48,Math.round(w)); h=Math.max(48,Math.round(h));
+    doc.facility.boundary.vertices=[[0,0],[w,0],[w,h],[0,h]];},
+  addBoundaryCorner(doc){const v=doc.facility.boundary.vertices;
+    let li=0,ld=-1; for(let i=0;i<v.length;i++){const a=v[i],b=v[(i+1)%v.length];
+      const d=Math.hypot(b[0]-a[0],b[1]-a[1]); if(d>ld){ld=d;li=i;}}
+    const a=v[li],b=v[(li+1)%v.length];
+    v.splice(li+1,0,[Math.round((a[0]+b[0])/2),Math.round((a[1]+b[1])/2)]); return li+1;},
+  removeBoundaryCorner(doc,i){const v=doc.facility.boundary.vertices;
+    if(v.length<=3||i==null)return; v.splice(i,1);},
+  _ftseq:0, newFeatureId(){return "ft"+(++this._ftseq);},
+  addFeature(doc,kind){const fb=G.bounds(doc.facility.boundary);
+    const cx=Math.round((fb.minX+fb.maxX)/2),cy=Math.round((fb.minY+fb.maxY)/2);
+    const f={id:this.newFeatureId(),kind};
+    if(kind==="column"){f.position=[cx,cy]; f.size=[8,8]; f.height=null;}
+    else if(kind==="door"){f.position=[cx,cy]; f.width=32; f.swingStart=0; f.swingSweep=90;}
+    else {f.position=[cx,cy]; f.width=36; f.facing=0;}
+    doc.facility.features.push(f); return f;},
+  removeFeature(doc,id){doc.facility.features=doc.facility.features.filter(f=>f.id!==id);},
   export(doc){const blob=new Blob([JSON.stringify(doc,null,2)],{type:"application/json"});
     const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
     a.download=(doc.meta.title||"bayplan").replace(/\s+/g,"-").toLowerCase()+".bayplan.json";
@@ -443,6 +540,35 @@ const Services = {
   }
 };
 
+/* ---- PLAT: scenario compare ---- */
+const Compare = {
+  withScenario(doc,scId,fn){const prev=doc.activeScenarioId; doc.activeScenarioId=scId;
+    try{return fn();}finally{doc.activeScenarioId=prev;}},
+  flowDistanceFt(doc,scId){return this.withScenario(doc,scId,()=>{
+    const sc=doc.scenarios.find(s=>s.id===scId);
+    return (sc.flows||[]).reduce((t,f)=>t+Flow.metrics(doc,f).feet,0);});},
+  summary(doc,scId){return this.withScenario(doc,scId,()=>{
+    const t=Trim.compute(doc), sv=Services.compute(doc);
+    return {trimErrors:t.errors,trimWarnings:t.warnings,
+      svcErrors:sv.errors,svcWarnings:sv.warnings,
+      flowFt:this.flowDistanceFt(doc,scId)};});},
+  delta(doc,aId,bId){
+    const scA=doc.scenarios.find(s=>s.id===aId), scB=doc.scenarios.find(s=>s.id===bId);
+    const aMap={},bMap={};
+    for(const p of scA.placements)aMap[p.id]=p;
+    for(const p of scB.placements)bMap[p.id]=p;
+    const added=[],removed=[],moved=[],same=[];
+    for(const id in bMap){ if(!aMap[id])added.push(bMap[id]);
+      else{const a=aMap[id],b=bMap[id];
+        if(a.position[0]!==b.position[0]||a.position[1]!==b.position[1]||(a.rotation||0)!==(b.rotation||0)||!!a.mirrored!==!!b.mirrored)moved.push(b);
+        else same.push(b);}}
+    for(const id in aMap) if(!bMap[id])removed.push(aMap[id]);
+    return {added,removed,moved,same,
+      a:this.summary(doc,aId),b:this.summary(doc,bId),
+      nameA:scA.name,nameB:scB.name};
+  }
+};
+
 /* ---- render + interaction ---- */
 const View = {
   el:null,doc:null,pad:24,_b:null,_H:0,conflicts:null,
@@ -534,6 +660,14 @@ const View = {
       g+=`<text x="${a[0]}" y="${a[1]-11}" fill="var(--ink)" font-size="8" font-family="var(--font-mono)" text-anchor="middle" style="pointer-events:none">${nd.label}</text>`;
       if(selN) g+=`<circle cx="${a[0]}" cy="${a[1]}" r="11" fill="none" stroke="var(--brass)" stroke-width="1.5" stroke-dasharray="4 3" style="pointer-events:none"/>`;
     }
+    // facility features (columns, doors, windows)
+    g+=this.featureSVG(doc, p=>this.toScreen(p), {ink:"var(--ink)",dim:"var(--ink-dim)",line:"var(--line)",hard:"var(--hard)"}, UI.selectedFeatureId);
+    // sounding mode: boundary vertex handles
+    if(UI.mode==="sounding"){
+      fac.boundary.vertices.forEach((v,i)=>{const a=this.toScreen(v);
+        const sel=i===UI.selectedVertex;
+        g+=`<rect x="${a[0]-4}" y="${a[1]-4}" width="8" height="8" fill="${sel?'var(--brass)':'var(--ground)'}" stroke="var(--brass)" stroke-width="1.5"/>`;});
+    }
     const bw=150,bh=54,bx=vbW-bw-6,by=vbH-bh-6;
     g+=`<g font-family="var(--font-mono)" style="pointer-events:none">
       <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="var(--panel)" stroke="var(--ink)" stroke-width="1"/>
@@ -546,6 +680,111 @@ const View = {
         <text x="0" y="-16" fill="var(--brass)" font-size="8" text-anchor="middle">N</text></g></g>`;
     this.el.innerHTML=`<svg viewBox="0 0 ${vbW} ${vbH}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Workshop floor plat">${g}</svg>`;
     this.bindPointer();
+  },
+  // shared feature renderer (columns, doors, windows), used by draw and platSVG
+  featureSVG(doc,S,pal,selId){
+    let g="";
+    for(const f of (doc.facility.features||[])){
+      const sel=f.id===selId;
+      if(f.kind==="column"){
+        const poly=Feat.columnPoly(f).map(p=>S(p).join(",")).join(" ");
+        g+=`<polygon points="${poly}" fill="${pal.ink}" fill-opacity="0.85" stroke="${pal.ink}" stroke-width="1"/>`;
+      } else if(f.kind==="door"){
+        const swing=Feat.doorSwingPoly(f).map(p=>S(p).join(",")).join(" ");
+        const hinge=S(f.position), leaf=S(Feat.doorLeafEnd(f));
+        g+=`<polygon points="${swing}" fill="${pal.dim}" fill-opacity="0.10" stroke="${pal.dim}" stroke-width="1" stroke-dasharray="3 3"/>`;
+        g+=`<line x1="${hinge[0]}" y1="${hinge[1]}" x2="${leaf[0]}" y2="${leaf[1]}" stroke="${pal.ink}" stroke-width="2"/>`;
+        g+=`<circle cx="${hinge[0]}" cy="${hinge[1]}" r="2.5" fill="${pal.ink}"/>`;
+      } else if(f.kind==="window"){
+        const seg=Feat.windowSeg(f); const a=S(seg[0]),b=S(seg[1]);
+        g+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${pal.line}" stroke-width="3"/>`;
+        g+=`<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="${pal.ink}" stroke-width="1" stroke-dasharray="2 3"/>`;
+      }
+      if(sel){const c=S(f.position);
+        g+=`<circle cx="${c[0]}" cy="${c[1]}" r="12" fill="none" stroke="var(--brass)" stroke-width="1.5" stroke-dasharray="4 3"/>`;}
+    }
+    return g;
+  },
+  // standalone plat renderer for compare (screen) and print (paper); no interaction
+  platSVG(doc,scId,opt={}){
+    const pal = opt.palette==="print"
+      ? {ink:"#111",dim:"#555",line:"#bbb",grid:"#eee",fp:"#333",fpFill:"#f4f4f4",panel:"#fff",
+         hard:"#c23a32",soft:"#a9761a",shared:"#1f7d74",dust:"#8a7a52",power:"#6a4f88",brass:"#7a5f10"}
+      : {ink:"var(--ink)",dim:"var(--ink-dim)",line:"var(--line)",grid:"var(--grid)",fp:"var(--footprint)",
+         fpFill:"var(--footprint-fill)",panel:"var(--panel)",hard:"var(--hard)",soft:"var(--soft)",
+         shared:"var(--shared)",dust:"var(--dust)",power:"var(--power)",brass:"var(--brass)"};
+    const sevVar={hard:pal.hard,soft:pal.soft,shared:pal.shared};
+    const sc=doc.scenarios.find(s=>s.id===scId); const fac=doc.facility;
+    const fb=G.bounds(fac.boundary); const pad=this.pad;
+    const W=fb.maxX-fb.minX,H=fb.maxY-fb.minY; const vbW=W+pad*2,vbH=H+pad*2;
+    const S=pt=>[pt[0]-fb.minX+pad, H-(pt[1]-fb.minY)+pad];
+    const PS=pts=>pts.map(p=>S(p).join(",")).join(" ");
+    const grid=doc.meta.gridSpacing||12;
+    const conf = opt.conflicts ? Compare.withScenario(doc,scId,()=>Trim.compute(doc)) : {worst:{}};
+    let g="";
+    for(let x=fb.minX;x<=fb.maxX+.1;x+=grid){const a=S([x,fb.minY]),c=S([x,fb.maxY]);
+      g+=`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" stroke="${pal.grid}"/>`;}
+    for(let y=fb.minY;y<=fb.maxY+.1;y+=grid){const a=S([fb.minX,y]),c=S([fb.maxX,y]);
+      g+=`<line x1="${a[0]}" y1="${a[1]}" x2="${c[0]}" y2="${c[1]}" stroke="${pal.grid}"/>`;}
+    g+=`<polygon points="${PS(fac.boundary.vertices)}" fill="none" stroke="${pal.ink}" stroke-width="1.5"/>`;
+    for(const pl of sc.placements){const def=Model.def(pl.defId); if(!def)continue;
+      for(const z of def.clearances){const wp=G.zoneWorldPoly(z,def,pl); const col=sevVar[z.severity]||pal.dim;
+        g+=`<polygon points="${PS(wp)}" fill="${col}" fill-opacity="0.13" stroke="${col}" stroke-opacity="0.45" stroke-width="1" stroke-dasharray="${z.severity==='hard'?'':'4 3'}"/>`;}}
+    for(const run of (sc.utilityRuns||[])){const poly=Services.routePolyline(doc,run); if(poly.length<2)continue;
+      if(run.system==="dust"){const rep=Services.dustRunReport(doc,run);
+        g+=`<polyline points="${PS(poly)}" fill="none" stroke="${rep.over?pal.hard:pal.dust}" stroke-width="4" stroke-opacity="0.7" stroke-linejoin="round"/>`;}
+      else g+=`<polyline points="${PS(poly)}" fill="none" stroke="${pal.power}" stroke-width="1.5" stroke-dasharray="2 4" stroke-opacity="0.85"/>`;}
+    for(const fl of (sc.flows||[])){const pts=(fl.waypoints||[]).map(wp=>Compare.withScenario(doc,scId,()=>Flow.wpWorld(doc,wp))).filter(Boolean);
+      if(pts.length>1)g+=`<polyline points="${PS(pts)}" fill="none" stroke="${fl.color}" stroke-width="2" stroke-linejoin="round"/>`;
+      for(const p of pts){const a=S(p); g+=`<circle cx="${a[0]}" cy="${a[1]}" r="3" fill="${pal.panel==='#fff'?'#fff':'var(--ground)'}" stroke="${fl.color}" stroke-width="2"/>`;}}
+    for(const pl of sc.placements){const def=Model.def(pl.defId); if(!def)continue;
+      const fp=G.footprintWorldPoly(def,pl);
+      const cs=conf.worst[pl.id]; const stroke=cs==="error"?pal.hard:cs==="warning"?pal.soft:pal.fp;
+      g+=`<polygon points="${PS(fp)}" fill="${cs?stroke:pal.fpFill}" fill-opacity="${cs?0.16:1}" stroke="${stroke}" stroke-width="${cs?2:1.5}"/>`;
+      const a=S(pl.position);
+      g+=`<text x="${a[0]}" y="${a[1]-7}" fill="${pal.ink}" font-size="8.5" font-family="var(--font-mono)" text-anchor="middle">${pl.label||def.name}</text>`;}
+    for(const nd of (sc.utilityNodes||[])){const a=S(nd.position);
+      if(nd.kind==="dust_collector") g+=`<circle cx="${a[0]}" cy="${a[1]}" r="7" fill="${pal.dust}" stroke="${pal.panel}" stroke-width="1.5"/>`;
+      else if(nd.kind==="panel") g+=`<rect x="${a[0]-6}" y="${a[1]-8}" width="12" height="16" fill="${pal.power}" stroke="${pal.panel}" stroke-width="1.5"/>`;
+      g+=`<text x="${a[0]}" y="${a[1]-11}" fill="${pal.ink}" font-size="8" font-family="var(--font-mono)" text-anchor="middle">${nd.label}</text>`;}
+    g+=this.featureSVG(doc, S, {ink:pal.ink,dim:pal.dim,line:pal.line,hard:pal.hard}, null);
+    // title block, scale bar, north arrow, legend (issued plat)
+    if(opt.titleBlock){
+      const d=doc.meta; const date=d.date||new Date().toISOString().slice(0,10);
+      const bw=180,bh=64,bx=vbW-bw-6,by=vbH-bh-6;
+      g+=`<g font-family="var(--font-mono)">
+        <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="${pal.panel}" stroke="${pal.ink}" stroke-width="1"/>
+        <line x1="${bx}" y1="${by+16}" x2="${bx+bw}" y2="${by+16}" stroke="${pal.line}"/>
+        <line x1="${bx}" y1="${by+40}" x2="${bx+bw}" y2="${by+40}" stroke="${pal.line}"/>
+        <line x1="${bx+bw*0.6}" y1="${by+16}" x2="${bx+bw*0.6}" y2="${by+bh}" stroke="${pal.line}"/>
+        <text x="${bx+7}" y="${by+11}" fill="${pal.ink}" font-size="9" letter-spacing="1.2">${(d.title||'UNTITLED').toUpperCase()}</text>
+        <text x="${bx+7}" y="${by+28}" fill="${pal.dim}" font-size="7.5">SCALE 1in = 1in</text>
+        <text x="${bx+7}" y="${by+37}" fill="${pal.dim}" font-size="7.5">${(doc.facility.name||'').toUpperCase()}</text>
+        <text x="${bx+bw*0.6+6}" y="${by+28}" fill="${pal.dim}" font-size="7.5">REV ${d.revision||'A'}</text>
+        <text x="${bx+bw*0.6+6}" y="${by+37}" fill="${pal.dim}" font-size="7.5">${date}</text>
+        <text x="${bx+7}" y="${by+52}" fill="${pal.dim}" font-size="7.5">DRAWN ${(d.author||'').toUpperCase()}</text>
+        <text x="${bx+7}" y="${by+61}" fill="${pal.dim}" font-size="7.5">SHEET ${sc.name.toUpperCase()}</text>
+        <text x="${bx+bw*0.6+6}" y="${by+55}" fill="${pal.brass}" font-size="7.5">BAYPLAN FI-075</text>
+        <g transform="translate(${bx+bw-16},${by+12})"><polygon points="0,-8 3,3 0,1 -3,3" fill="${pal.brass}"/><text x="0" y="-10" fill="${pal.brass}" font-size="7" text-anchor="middle">N</text></g>
+      </g>`;
+      // scale bar: 24 inches (2 ft)
+      const sbx=6+pad, sby=vbH-14, len=24;
+      g+=`<g font-family="var(--font-mono)"><line x1="${sbx}" y1="${sby}" x2="${sbx+len}" y2="${sby}" stroke="${pal.ink}" stroke-width="1.5"/>
+        <line x1="${sbx}" y1="${sby-3}" x2="${sbx}" y2="${sby+3}" stroke="${pal.ink}"/>
+        <line x1="${sbx+len}" y1="${sby-3}" x2="${sbx+len}" y2="${sby+3}" stroke="${pal.ink}"/>
+        <text x="${sbx+len/2}" y="${sby-5}" fill="${pal.dim}" font-size="7" text-anchor="middle">2 ft</text></g>`;
+    }
+    if(opt.legend){
+      const items=[["Hard clearance",pal.hard],["Soft clearance",pal.soft],["Shared clearance",pal.shared],
+        ["Dust run",pal.dust],["Electrical",pal.power]];
+      const lx=6+pad, ly=6+pad;
+      g+=`<g font-family="var(--font-mono)">`;
+      items.forEach((it,i)=>{const y=ly+i*12;
+        g+=`<rect x="${lx}" y="${y}" width="9" height="9" fill="${it[1]}" fill-opacity="0.5" stroke="${it[1]}"/>`;
+        g+=`<text x="${lx+13}" y="${y+8}" fill="${pal.ink}" font-size="7.5">${it[0]}</text>`;});
+      g+=`</g>`;
+    }
+    return {svg:`<svg viewBox="0 0 ${vbW} ${vbH}" preserveAspectRatio="xMidYMid meet">${g}</svg>`, vbW, vbH};
   },
   bindPointer(){
     const svg=this.el.querySelector("svg"); if(!svg)return;
@@ -562,6 +801,24 @@ const View = {
           drag={node:hn.id,offX:w[0]-hn.position[0],offY:w[1]-hn.position[1]};
           svg.setPointerCapture(e.pointerId);
         } else UI.selectNode(null);
+        return;
+      }
+      if(UI.mode==="sounding"){
+        const V=this.doc.facility.boundary.vertices;
+        // boundary vertex handles first (within ~12in)
+        let vi=-1,bd=12;
+        V.forEach((v,i)=>{const d=Math.hypot(v[0]-w[0],v[1]-w[1]); if(d<bd){bd=d;vi=i;}});
+        if(vi>=0){ UI.selectVertex(vi);
+          drag={vertex:vi,offX:w[0]-V[vi][0],offY:w[1]-V[vi][1]}; svg.setPointerCapture(e.pointerId); return; }
+        // then features
+        let hf=null;
+        for(let i=this.doc.facility.features.length-1;i>=0;i--){const f=this.doc.facility.features[i];
+          const near=Math.hypot(f.position[0]-w[0],f.position[1]-w[1])<12;
+          const inCol=f.kind==="column"&&G.pointInPolygon(w,Feat.columnPoly(f));
+          if(near||inCol){hf=f;break;}}
+        if(hf){ UI.selectFeature(hf.id);
+          drag={feature:hf.id,offX:w[0]-hf.position[0],offY:w[1]-hf.position[1]}; svg.setPointerCapture(e.pointerId);
+        } else UI.selectFeature(null);
         return;
       }
       let hit=null;
@@ -581,6 +838,14 @@ const View = {
         let nx=w[0]-drag.offX, ny=w[1]-drag.offY;
         if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
         nd.position=[nx,ny]; this.refresh(); return;}
+      if(drag.vertex!=null){const V=this.doc.facility.boundary.vertices;
+        let nx=w[0]-drag.offX, ny=w[1]-drag.offY;
+        if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
+        V[drag.vertex]=[nx,ny]; this.refresh(); return;}
+      if(drag.feature){const f=this.doc.facility.features.find(x=>x.id===drag.feature); if(!f)return;
+        let nx=w[0]-drag.offX, ny=w[1]-drag.offY;
+        if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
+        f.position=[nx,ny]; this.refresh(); return;}
       const pl=sc.placements.find(p=>p.id===drag.id); if(!pl)return;
       let nx=w[0]-drag.offX, ny=w[1]-drag.offY;
       if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
@@ -595,8 +860,26 @@ const View = {
 /* ---- ui ---- */
 const UI = {
   doc:null, selectedId:null, mode:"select", activeFlowId:null, selectedFlowId:null, selectedNodeId:null,
+  selectedVertex:null, selectedFeatureId:null,
   boot(){ if(location.hash==="#test"){Tests.run();return;}
     this.doc=Model.demo(); this.render();},
+  enterSounding(){this.mode="sounding"; this.selectedId=null; this.selectedFlowId=null; this.activeFlowId=null;
+    this.selectedNodeId=null; View.refresh();},
+  exitSounding(){this.mode="select"; this.selectedVertex=null; this.selectedFeatureId=null; View.refresh();},
+  selectVertex(i){this.selectedVertex=i; this.selectedFeatureId=null; View.draw(); this.syncPanels();},
+  selectFeature(id){this.selectedFeatureId=id; this.selectedVertex=null; View.draw(); this.syncPanels();},
+  setRoom(w,h){Model.setFacilityRect(this.doc,w,h); this.selectedVertex=null; View.refresh();},
+  addCorner(){const i=Model.addBoundaryCorner(this.doc); this.selectedVertex=i; View.refresh();},
+  removeCorner(){if(this.selectedVertex!=null){Model.removeBoundaryCorner(this.doc,this.selectedVertex);
+    this.selectedVertex=null; View.refresh();}},
+  addFeature(kind){const f=Model.addFeature(this.doc,kind); if(this.mode!=="sounding")this.mode="sounding";
+    this.selectedFeatureId=f.id; View.refresh();},
+  removeFeature(id){Model.removeFeature(this.doc,id); if(this.selectedFeatureId===id)this.selectedFeatureId=null; View.refresh();},
+  rotateFeature(delta){const f=this.doc.facility.features.find(x=>x.id===this.selectedFeatureId);
+    if(!f)return;
+    if(f.kind==="door")f.swingStart=(((f.swingStart||0)+delta)%360+360)%360;
+    else if(f.kind==="window")f.facing=(((f.facing||0)+delta)%360+360)%360;
+    View.refresh();},
   enterServices(){this.mode="services"; this.selectedId=null; this.selectedFlowId=null; this.activeFlowId=null; View.refresh();},
   exitServices(){this.mode="select"; this.selectedNodeId=null; View.refresh();},
   addNode(kind){Model.addNode(this.doc,kind); if(this.mode!=="services")this.mode="services"; View.refresh();},
@@ -636,13 +919,68 @@ const UI = {
     const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
     sc.placements=sc.placements.filter(p=>p.id!==pl.id); this.selectedId=null; View.refresh();},
   addMachine(defId){const pl=Model.add(this.doc,defId); this.selectedId=pl.id; View.refresh();},
+  dupScenario(){Model.duplicateScenario(this.doc); this.selectedId=null; this.selectedNodeId=null;
+    this.mode="select"; this.render();},
+  switchScenario(id){Model.setActiveScenario(this.doc,id); this.selectedId=null; this.selectedNodeId=null;
+    this.mode="select"; this.render();},
+  showCompare(){
+    if(this.doc.scenarios.length<2){this.dupScenario(); return;}
+    const ids=this.doc.scenarios.map(s=>s.id);
+    const aId=this.doc.activeScenarioId;
+    const bId=ids.find(i=>i!==aId);
+    const d=Compare.delta(this.doc,aId,bId);
+    const pa=View.platSVG(this.doc,aId,{palette:"theme",conflicts:true});
+    const pb=View.platSVG(this.doc,bId,{palette:"theme",conflicts:true});
+    const row=(label,va,vb,cls)=>`<tr><td>${label}</td><td>${va}</td><td>${vb}</td></tr>`;
+    const names={a:d.nameA,b:d.nameB};
+    document.getElementById("app").innerHTML=`<div id="compare">
+      <h1>Scenario compare</h1>
+      <p style="color:var(--ink-dim); font-size:12.5px; margin:0">${names.a} versus ${names.b}. Conflicts are shown in place on each plat.</p>
+      <div class="pair">
+        <div class="col"><h3>${names.a}</h3><div class="plat">${pa.svg}</div></div>
+        <div class="col"><h3>${names.b}</h3><div class="plat">${pb.svg}</div></div>
+      </div>
+      <table>
+        <thead><tr><th>Metric</th><th>${names.a}</th><th>${names.b}</th></tr></thead>
+        <tbody>
+          ${row("Machines", d.a.trimErrors!=null?(d.same.length+d.moved.length+d.removed.length):"", (d.same.length+d.moved.length+d.added.length))}
+          ${row("TRIM errors", d.a.trimErrors, d.b.trimErrors)}
+          ${row("TRIM warnings", d.a.trimWarnings, d.b.trimWarnings)}
+          ${row("Utilities errors", d.a.svcErrors, d.b.svcErrors)}
+          ${row("Utilities warnings", d.a.svcWarnings, d.b.svcWarnings)}
+          ${row("Total flow", d.a.flowFt.toFixed(1)+" ft", d.b.flowFt.toFixed(1)+" ft")}
+        </tbody>
+      </table>
+      <p style="font-family:var(--font-mono); font-size:12px; margin-top:14px">
+        <span class="delta-add">+${d.added.length} added</span> \u00b7
+        <span class="delta-rem">-${d.removed.length} removed</span> \u00b7
+        <span class="delta-mov">${d.moved.length} moved</span>
+        ${d.moved.length?`<br><span style="color:var(--ink-dim); font-size:11px">moved: ${d.moved.map(p=>p.label||Model.def(p.defId).name).join(", ")}</span>`:""}
+      </p>
+      <p style="margin-top:16px"><a href="#" onclick="UI.render();return false">\u2190 back to plat</a></p>
+    </div>`;
+  },
+  printPlat(){
+    if(!this.doc.meta.date) this.doc.meta.date=new Date().toISOString().slice(0,10);
+    const sheet=View.platSVG(this.doc,this.doc.activeScenarioId,{palette:"print",titleBlock:true,legend:true,conflicts:false});
+    document.getElementById("printSheet").innerHTML=sheet.svg;
+    window.print();
+  },
   render(){
     const lib=Model.library();
+    const scenarios=this.doc.scenarios; const activeSc=this.doc.activeScenarioId;
     document.getElementById("app").innerHTML=`
       <header>
         <span class="wordmark">BAYPLAN</span><span class="fi">FI-075</span>
         <span class="tag">stow the floor</span><span class="spacer"></span>
         <div class="toolbar">
+          <span class="seg" role="group" aria-label="Scenario">
+            ${scenarios.map(s=>`<button data-scenario="${s.id}" aria-pressed="${s.id===activeSc}">${s.name}</button>`).join("")}
+          </span>
+          <button id="dupBtn" title="Duplicate active scenario">+ Scenario</button>
+          <button id="roomBtn">Room</button>
+          <button id="compareBtn" ${scenarios.length<2?'disabled':''}>Compare</button>
+          <button id="printBtn">Print</button>
           <button id="newBtn">New</button>
           <button id="importBtn">Import</button>
           <button id="exportBtn">Export</button>
@@ -657,6 +995,7 @@ const UI = {
         <div class="stage" id="stage"></div>
         <aside>
           <section id="selWrap"></section>
+          <section id="soundWrap"></section>
           <section id="trimWrap"></section>
           <section id="flowWrap"></section>
           <section id="svcWrap"></section>
@@ -683,6 +1022,11 @@ const UI = {
     View.scene(this.doc);
     document.getElementById("newBtn").onclick=()=>{this.doc=Model.emptyFacility(); this.selectedId=null; View.scene(this.doc);};
     document.getElementById("exportBtn").onclick=()=>Model.export(this.doc);
+    document.getElementById("dupBtn").onclick=()=>this.dupScenario();
+    document.getElementById("roomBtn").onclick=()=>this.enterSounding();
+    document.getElementById("compareBtn").onclick=()=>this.showCompare();
+    document.getElementById("printBtn").onclick=()=>this.printPlat();
+    for(const b of document.querySelectorAll("[data-scenario]")) b.onclick=()=>this.switchScenario(b.dataset.scenario);
     document.getElementById("importBtn").onclick=()=>{const inp=document.createElement("input");
       inp.type="file"; inp.accept=".json";
       inp.onchange=()=>{if(inp.files[0])Model.import(inp.files[0]).then(d=>{this.doc=d;this.selectedId=null;View.scene(d);}).catch(e=>alert("Import failed: "+e.message));};
@@ -694,6 +1038,15 @@ const UI = {
   bindKeys(){
     document.onkeydown=e=>{
       if(e.target.tagName==="INPUT")return;
+      if(this.mode==="sounding"){
+        if(e.key==="Escape")this.exitSounding();
+        else if((e.key==="r"||e.key==="R")&&this.selectedFeatureId){this.rotateFeature(e.shiftKey?-15:15);e.preventDefault();}
+        else if((e.key==="Delete"||e.key==="Backspace")){
+          if(this.selectedFeatureId)this.removeFeature(this.selectedFeatureId);
+          else if(this.selectedVertex!=null)this.removeCorner();
+          e.preventDefault();}
+        return;
+      }
       if(this.mode==="services"){
         if(e.key==="Escape")this.exitServices();
         else if((e.key==="Delete"||e.key==="Backspace")&&this.selectedNodeId){this.removeNode(this.selectedNodeId);e.preventDefault();}
@@ -834,11 +1187,63 @@ const UI = {
         vw.querySelector('[data-sv="enter"]').onclick=()=>this.enterServices();
       }
     }
+    // SOUNDING panel
+    const soundWrap=document.getElementById("soundWrap");
+    if(soundWrap){
+      const fac=this.doc.facility; const fb=G.bounds(fac.boundary);
+      const w=Math.round(fb.maxX-fb.minX), h=Math.round(fb.maxY-fb.minY);
+      const feats=fac.features||[];
+      if(this.mode==="sounding"){
+        const selF=feats.find(f=>f.id===this.selectedFeatureId);
+        const canRemoveCorner=this.selectedVertex!=null&&fac.boundary.vertices.length>3;
+        soundWrap.innerHTML=`<h2>Room</h2>
+          <div class="row" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap">
+            <input id="rw" type="number" value="${w}" style="width:66px" aria-label="width inches">
+            <span style="color:var(--ink-dim)">\u00d7</span>
+            <input id="rh" type="number" value="${h}" style="width:66px" aria-label="depth inches">
+            <button data-so="rect">Set in</button>
+          </div>
+          <div class="row" style="display:flex; gap:6px; margin-top:6px">
+            <button data-so="addc" style="flex:1">Add corner</button>
+            <button data-so="delc" style="flex:1" ${canRemoveCorner?'':'disabled'}>Remove corner</button>
+          </div>
+          <h2 style="margin-top:16px">Features</h2>
+          <div class="row" style="display:flex; gap:6px; flex-wrap:wrap">
+            <button data-so="col" style="flex:1;min-width:70px">+ Column</button>
+            <button data-so="door" style="flex:1;min-width:70px">+ Door</button>
+            <button data-so="win" style="flex:1;min-width:70px">+ Window</button>
+          </div>
+          ${selF?`<div class="selpanel" style="margin-top:8px">
+            <div class="name">${selF.kind==="door"?"Door":selF.kind==="window"?"Window":"Column"}</div>
+            ${(selF.kind==="door"||selF.kind==="window")?`<div class="row"><button data-so="rotL">\u21b6 15</button><button data-so="rotR">15 \u21b7</button></div>`:``}
+            <div class="row" style="margin-top:6px"><button data-so="delf" class="danger" style="width:100%">Remove</button></div>
+          </div>`:`<p class="empty" style="margin-top:8px">Drag corners to reshape the room. Add columns, doors, and windows, then drag them into place. Door swings and columns check against your machines.</p>`}
+          <button data-so="exit" style="width:100%;margin-top:10px">Done</button>`;
+        soundWrap.querySelector('[data-so="rect"]').onclick=()=>this.setRoom(+soundWrap.querySelector("#rw").value,+soundWrap.querySelector("#rh").value);
+        soundWrap.querySelector('[data-so="addc"]').onclick=()=>this.addCorner();
+        const dc=soundWrap.querySelector('[data-so="delc"]'); if(dc&&!dc.disabled)dc.onclick=()=>this.removeCorner();
+        soundWrap.querySelector('[data-so="col"]').onclick=()=>this.addFeature("column");
+        soundWrap.querySelector('[data-so="door"]').onclick=()=>this.addFeature("door");
+        soundWrap.querySelector('[data-so="win"]').onclick=()=>this.addFeature("window");
+        soundWrap.querySelector('[data-so="exit"]').onclick=()=>this.exitSounding();
+        const rl=soundWrap.querySelector('[data-so="rotL"]'); if(rl)rl.onclick=()=>this.rotateFeature(-15);
+        const rr=soundWrap.querySelector('[data-so="rotR"]'); if(rr)rr.onclick=()=>this.rotateFeature(15);
+        const df=soundWrap.querySelector('[data-so="delf"]'); if(df)df.onclick=()=>this.removeFeature(this.selectedFeatureId);
+      } else {
+        const doors=feats.filter(f=>f.kind==="door").length, cols=feats.filter(f=>f.kind==="column").length, wins=feats.filter(f=>f.kind==="window").length;
+        soundWrap.innerHTML=`<h2>Room</h2>
+          <p style="font-size:12.5px; margin:0 0 8px; color:var(--ink-dim)">${w} \u00d7 ${h} in \u00b7 ${fac.boundary.vertices.length} corners${feats.length?` \u00b7 ${cols}c ${doors}d ${wins}w`:``}</p>
+          <button data-so="enter" style="width:100%">Edit room</button>`;
+        soundWrap.querySelector('[data-so="enter"]').onclick=()=>this.enterSounding();
+      }
+    }
     const mh=document.getElementById("modeHint");
     if(mh) mh.textContent = this.mode==="route"
       ? "routing: click machines in order \u00b7 Esc or Done to finish"
       : this.mode==="services"
       ? "utilities: drag nodes \u00b7 add collector/panel, then Wire all \u00b7 Esc to finish"
+      : this.mode==="sounding"
+      ? "room: drag corners and features \u00b7 add via the panel \u00b7 Esc to finish"
       : "drag to move \u00b7 R rotate \u00b7 M mirror \u00b7 Del remove";
   }
 };
@@ -900,6 +1305,22 @@ const Tests = {
     (()=>{const d=Model.emptyFacility(); d.scenarios[0].placements=[
       {id:"a",defId:"builtin-drill-press",position:[144,108],rotation:0,mirrored:false}];
       const c=Trim.compute(d); this.ok("TRIM: lone centered machine clear",c.errors===0&&c.warnings===0);})();
+    // TRIM minHeight (vertical bands)
+    this.ok("TRIM: low body clears a high feed lane band",!Trim.vOverlap({lo:0,hi:16},{lo:40,hi:108}));
+    this.ok("TRIM: tall body intrudes a feed lane band",Trim.vOverlap({lo:0,hi:66},{lo:40,hi:108}));
+    this.ok("TRIM: any body meets a full-height operator band",Trim.vOverlap({lo:0,hi:16},{lo:0,hi:108}));
+    (()=>{const d=Model.emptyFacility(); d.facility.boundary.vertices=[[0,0],[600,0],[600,600],[0,600]];
+      d.scenarios[0].placements=[
+        {id:"a",defId:"builtin-table-saw-cabinet",position:[300,260],rotation:0,mirrored:false},
+        {id:"b",defId:"builtin-table-saw-cabinet",position:[300,330],rotation:0,mirrored:false}];
+      const c=Trim.compute(d);
+      this.ok("TRIM: two short saws in line, feed-lane-over-body suppressed by height",c.errors===0&&c.warnings===0,c.errors+"e/"+c.warnings+"w");})();
+    (()=>{const d=Model.emptyFacility(); d.facility.boundary.vertices=[[0,0],[600,0],[600,600],[0,600]];
+      d.scenarios[0].placements=[
+        {id:"a",defId:"builtin-table-saw-cabinet",position:[300,260],rotation:0,mirrored:false},
+        {id:"b",defId:"builtin-drill-press",position:[300,330],rotation:0,mirrored:false}];
+      const c=Trim.compute(d);
+      this.ok("TRIM: a tall drill press in the same feed lane is flagged",c.warnings>=1,c.warnings+" warnings");})();
     // ROUTING
     (()=>{const s=lib.find(m=>m.id==="builtin-table-saw-cabinet");
       this.ok("ROUTING: seed machines carry work points", (s.ports||[]).length>0, (s.ports||[]).length+" ports on saw");})();
@@ -977,13 +1398,64 @@ const Tests = {
       Services.wireAll(d);
       const s=Services.compute(d);
       this.ok("SERVICES: 240V machine on a 240V panel is clean",s.errors===0&&s.load240>0,s.load240+"A @240V");})();
+    // PLAT
+    (()=>{const d=Model.emptyFacility();
+      d.scenarios[0].placements=[{id:"a",defId:"builtin-drill-press",position:[100,100],rotation:0,mirrored:false}];
+      Model.duplicateScenario(d);
+      this.ok("PLAT: duplicate makes a second scenario",d.scenarios.length===2);
+      d.scenarios[1].placements[0].position=[200,200];
+      this.ok("PLAT: scenarios are independent after edit",d.scenarios[0].placements[0].position[0]===100);})();
+    (()=>{const d=Model.emptyFacility();
+      d.scenarios[0].placements=[
+        {id:"a",defId:"builtin-drill-press",position:[100,100],rotation:0,mirrored:false},
+        {id:"b",defId:"builtin-jointer-8in",position:[150,150],rotation:0,mirrored:false}];
+      Model.duplicateScenario(d);
+      const b=d.scenarios[1];
+      b.placements.find(p=>p.id==="a").position=[120,100];
+      b.placements=b.placements.filter(p=>p.id!=="b");
+      b.placements.push({id:"c",defId:"builtin-bandsaw-14in",position:[200,80],rotation:0,mirrored:false});
+      const delta=Compare.delta(d,"s1",b.id);
+      this.ok("PLAT: delta detects a moved machine",delta.moved.length===1,delta.moved.length+" moved");
+      this.ok("PLAT: delta detects a removed machine",delta.removed.length===1);
+      this.ok("PLAT: delta detects an added machine",delta.added.length===1);})();
+    (()=>{const d=Model.demo();
+      const sheet=View.platSVG(d,d.activeScenarioId,{palette:"print",titleBlock:true,legend:true});
+      this.ok("PLAT: printable sheet carries title block and scale bar",
+        /BAYPLAN FI-075/.test(sheet.svg)&&/2 ft/.test(sheet.svg)&&/REV /.test(sheet.svg));
+      this.ok("PLAT: printable sheet carries a legend",/Dust run/.test(sheet.svg)&&/Electrical/.test(sheet.svg));})();
+    // SOUNDING
+    (()=>{const d=Model.emptyFacility(); Model.setFacilityRect(d,400,300);
+      const v=d.facility.boundary.vertices;
+      this.ok("SOUNDING: setFacilityRect builds a W by H rectangle",v.length===4&&v[2][0]===400&&v[2][1]===300);
+      const i=Model.addBoundaryCorner(d);
+      this.ok("SOUNDING: add corner inserts a vertex",d.facility.boundary.vertices.length===5);
+      Model.removeBoundaryCorner(d,i);
+      this.ok("SOUNDING: remove corner deletes a vertex",d.facility.boundary.vertices.length===4);
+      Model.removeBoundaryCorner(d,0); Model.removeBoundaryCorner(d,0);
+      this.ok("SOUNDING: cannot drop below three corners",d.facility.boundary.vertices.length>=3);})();
+    (()=>{const d=Model.emptyFacility();
+      d.scenarios[0].placements=[{id:"a",defId:"builtin-table-saw-cabinet",position:[150,120],rotation:0,mirrored:false}];
+      const col=Model.addFeature(d,"column"); col.position=[150,120]; // column on the saw
+      this.ok("SOUNDING: a column on a machine is an error",Trim.compute(d).errors>0);
+      col.position=[20,20];
+      this.ok("SOUNDING: moving the column away clears it",Trim.compute(d).errors===0);})();
+    (()=>{const d=Model.emptyFacility();
+      d.scenarios[0].placements=[{id:"a",defId:"builtin-drill-press",position:[100,100],rotation:0,mirrored:false}];
+      const dr=Model.addFeature(d,"door"); dr.position=[100,80]; dr.width=40; dr.swingStart=270; dr.swingSweep=90;
+      this.ok("SOUNDING: a door swing over a machine is flagged",Trim.compute(d).errors>0||Trim.compute(d).warnings>0);
+      dr.position=[20,220];
+      const c=Trim.compute(d); this.ok("SOUNDING: moving the door away clears it",c.errors===0&&c.warnings===0);})();
+    (()=>{const d=Model.emptyFacility();
+      d.scenarios[0].placements=[{id:"a",defId:"builtin-table-saw-cabinet",position:[150,120],rotation:0,mirrored:false}];
+      Model.addFeature(d,"window"); d.facility.features[0].position=[150,120];
+      this.ok("SOUNDING: a window does not constrain placement",Trim.compute(d).errors===0&&Trim.compute(d).warnings===0);})();
     this.paint();
   },
   paint(){
     const pass=this.results.filter(r=>r.pass).length,total=this.results.length;
     const rows=this.results.map(r=>`<tr><td class="${r.pass?'t-pass':'t-fail'}">${r.pass?'PASS':'FAIL'}</td><td>${r.name}</td><td style="color:var(--ink-dim)">${r.detail||""}</td></tr>`).join("");
     document.getElementById("app").innerHTML=`<div id="tests">
-      <h1>BAYPLAN \u00b7 geometry + TRIM + ROUTING + SERVICES test harness</h1>
+      <h1>BAYPLAN \u00b7 full-arc test harness (SOUNDING \u00b7 TRIM \u00b7 ROUTING \u00b7 SERVICES \u00b7 PLAT)</h1>
       <div class="summary ${pass===total?'t-pass':'t-fail'}">${pass} / ${total} passing${pass===total?"  \u00b7 release gate green":"  \u00b7 gate RED"}</div>
       <table><tbody>${rows}</tbody></table>
       <p style="margin-top:18px"><a href="#" onclick="location.hash='';location.reload()">\u2190 back to plat</a></p></div>`;

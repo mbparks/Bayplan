@@ -14,7 +14,7 @@ Three things, all in the data model rather than the UI:
 
 ## Status
 
-v0.0.4. Four of the eight stations are live: STOWAGE, TRIM, ROUTING, and now SERVICES. Beyond placing machines, checking clearances, and tracing material flow, you can now lay the utilities graph: drop a dust collector and an electrical panel, drag them into place, and wire every machine to its nearest node in one click. SERVICES then reports dust-run effective length (straight run plus inferred elbow equivalents) against a per-diameter budget, and rolls up electrical load with a 240V-reachability check. The v0.0.1 scaffold stood up the geometry core, the built-in library, the plat render, the theme system, and the test harness.
+v0.0.7. The full eight-station arc is now functional end to end, and SOUNDING is the capstone. You can reshape the room: edit its dimensions, drag boundary corners, and add or remove corners for L-shaped floors and bump-outs. You can place features: columns (solid obstacles), doors (with swing arcs), and windows. Door swings and columns check against your machines through the same TRIM engine, so a machine blocking a door or landing on a post is flagged, using the same arc primitive the lathe swing uses. Everything from the earlier releases stands: placement (STOWAGE), clearance checking with vertical `minHeight` bands (TRIM), material flow (ROUTING), the utilities graph (SERVICES), and scenario-compare with a printable plat (PLAT). All three original data-model open items are closed.
 
 ## Repository layout
 
@@ -40,9 +40,13 @@ Routing: in the Material flow panel, click New flow, then click machines in the 
 
 Utilities: in the Utilities panel, click Open utilities, then add a dust collector and an electrical panel. Drag each node where it belongs, then click Wire all to connect every machine to its nearest collector (dust) and panel (electrical). The panel reports dust-run effective lengths, connected electrical load, and any warnings; drag a node and the numbers update live. Select a node to remove it. Escape finishes.
 
+Scenarios and plat: the scenario switcher in the header lets you keep more than one layout. + Scenario duplicates the active one (as Proposed), so you can rearrange a copy without losing the original. Compare shows the two side by side with a delta summary (added, removed, and moved machines, plus TRIM, utilities, and flow figures for each). Print issues the active scenario as a plat with a full title block, scale bar, north arrow, and legend, on a clean white sheet.
+
+Room: click Room to edit the facility. Set the room's dimensions in inches, drag the corner handles to reshape it, or use Add corner and Remove corner for L-shapes and bump-outs. Add columns, doors, and windows, then drag them into place; doors and windows rotate with R (or the panel buttons). Door swings and columns are checked against your machines by TRIM. Escape finishes.
+
 ## Tests
 
-The test harness is browser-runnable at `bayplan.html#test`, seeded with the built-in library as its fixture. It covers the geometry core (bounds with offset anchors, edge projection, point-in-polygon, the bearing convention, point-in-arc, the mirror transform, the placement transform, segment intersection, and polygon overlap), the TRIM checker (the full severity-interaction matrix plus end-to-end scenarios), ROUTING (work-point snapping, travel distance, backtrack detection, and crossing detection), and SERVICES (elbow-equivalent inference, dust-run budget warnings, and the electrical rollup with voltage reachability). The release gate is green only when every assertion passes.
+The test harness is browser-runnable at `bayplan.html#test`, seeded with the built-in library as its fixture. It covers the geometry core (bounds with offset anchors, edge projection, point-in-polygon, the bearing convention, point-in-arc, the mirror transform, the placement transform, segment intersection, and polygon overlap), the TRIM checker (the full severity-interaction matrix, the vertical-band `minHeight` logic that lets a short machine sit under a high feed lane while a tall one is caught, plus end-to-end scenarios), ROUTING (work-point snapping, travel distance, backtrack detection, and crossing detection), SERVICES (elbow-equivalent inference, dust-run budget warnings, and the electrical rollup with voltage reachability), PLAT (scenario independence after duplication, delta detection, and the printable sheet), and SOUNDING (boundary resize and add/remove corner, plus column-obstacle, door-swing, and window conflict behavior). The release gate is green only when every assertion passes.
 
 ## Local frame convention
 
@@ -50,10 +54,12 @@ Origin at the machine anchor, +y back (away from the operator), +x to the operat
 
 ## Known Limitations
 
-- Only a single rectangular facility is supported in the UI. The model allows an arbitrary boundary polygon, but there is no wall-drawing tool yet, and features (doors, columns, windows) are not placeable, so door-swing conflicts are not checked.
-- Only one scenario. Scenario-compare (current versus proposed side by side) is in the data model but not in the UI.
-- Conflict checking is pairwise and geometric. It does not yet account for `minHeight`, so a feed lane passing over a low cabinet is still flagged as if the cabinet were full height. Honoring `minHeight` is the next refinement to TRIM.
-- No undo for placement. Deleting or moving a machine is immediate; recovery is by re-adding or dragging back. (Flow routing does have an undo for the last waypoint.)
+- Boundary editing is by corner handles and dimension entry. There is no free-form click-to-draw wall tool, and corners snap to one inch. Angled or curved walls are approximated by adding straight-edged corners.
+- Features are placed by button and dragged into position; they do not snap to the nearest wall automatically, so a door or window can be dragged into open floor. Its swing and conflict logic still work wherever it sits.
+- Door swing is modeled as a quarter-circle arc from the hinge, treated as a full-height hard zone. It does not model leaf thickness or a partial-height opening.
+- Scenario compare pairs the active scenario against the first other scenario. With three or more scenarios there is no picker yet for which two to compare.
+- Printing relies on the browser's print dialog and its page-size and margin handling. The plat scales to fit the sheet; there is no fixed paper-size or multi-page tiling.
+- No undo for placement. Deleting or moving a machine is immediate; recovery is by re-adding or dragging back. (Flow routing has an undo for the last waypoint.)
 - Flow waypoints snap to a machine's work points, or to its anchor when the machine has no work points defined. Only the flow-relevant machines in the seed (saw, jointer, planer, bandsaw, miter saw, CNC) carry work points; everything else routes through its anchor.
 - Backtrack detection uses the net start-to-end direction of a flow. A flow that returns exactly to its start (zero net travel) cannot report backtracks by this measure; genuine process flows have a net direction, so this is a corner case rather than a real limit.
 - The utilities graph auto-routes runs: dust as a single orthogonal L (one elbow), electrical as a straight line. There is no manual duct routing with multiple bends yet, so a real run with several elbows is under-counted. Effective-length and elbow math is in place for when manual routing lands.
@@ -66,7 +72,7 @@ Origin at the machine anchor, +y back (away from the operator), +x to the operat
 
 ## Roadmap
 
-BAYPLAN runs an eight-station arc: SOUNDING (set the floor), MANIFEST (build the library), ENVELOPE (define the halos), STOWAGE (place), TRIM (balance conflicts), ROUTING (material flow), SERVICES (utilities graph), PLAT (compare and issue). Delivered so far: ENVELOPE's built-in defaults, the render foundation, STOWAGE, TRIM, ROUTING, and now SERVICES. What remains: SOUNDING (a real wall-drawing tool and placeable features, which also unlocks door-swing conflicts), the minHeight refinement to TRIM, and PLAT (scenario-compare and a printable sheet). See the station arc in `bayplan-data-model.md`.
+BAYPLAN runs an eight-station arc: SOUNDING (set the floor), MANIFEST (build the library), ENVELOPE (define the halos), STOWAGE (place), TRIM (balance conflicts), ROUTING (material flow), SERVICES (utilities graph), PLAT (compare and issue). As of this release all eight are functional end to end: you can shape a room and place features, build the library and its halos, stow machines, trim their conflicts in three dimensions, route the flow, run the services, and compare and issue the plat. The three data-model open items are closed. Future work is depth rather than breadth: a free-form wall tool, wall-snapping for features, manual multi-bend duct routing, per-circuit electrical assignment, a compare picker for three-plus scenarios, and undo. See the station arc in `bayplan-data-model.md`.
 
 ## License
 
