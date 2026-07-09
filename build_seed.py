@@ -54,6 +54,10 @@ def power(v, amps, phase=1, dedicated=False):
 def dust(pos, dia):
     return {"position": pos, "diameter": dia}
 
+def air(pos, cfm, psi=90):
+    # compressed-air consumer port: scfm demand at a working pressure (psi)
+    return {"position": pos, "cfm": cfm, "psi": psi}
+
 def wp(pid, label, x, y):
     return {"id": pid, "label": label, "position": [x, y]}
 
@@ -62,13 +66,13 @@ def prov():
             "seededFields": [], "seededAt": None, "localEdits": []}
 
 def machine(mid, name, category, fp, anchor_note, height, weight,
-            pw, dp, clearances, ports):
+            pw, dp, clearances, ports, ap=None):
     return {
         "id": mid, "name": name, "category": category,
         "provenance": prov(),
         "footprint": fp, "anchor": [0, 0], "anchorNote": anchor_note,
         "height": height, "weight": weight,
-        "power": pw, "dustPort": dp,
+        "power": pw, "dustPort": dp, "airPort": ap,
         "clearances": clearances, "ports": ports,
     }
 
@@ -221,6 +225,7 @@ M.append(machine(
              "operator at the carriage"),
     ],
     [],
+    air([-3, -7], 3, 90),
 ))
 
 # 9. Benchtop mill ------------------------------------------------------------
@@ -238,6 +243,7 @@ M.append(machine(
              "operator at the handwheels"),
     ],
     [],
+    air([0, 0], 3, 90),
 ))
 
 # 10. CNC router 4x4 ----------------------------------------------------------
@@ -259,6 +265,7 @@ M.append(machine(
              "side access for bit changes"),
     ],
     [wp("in", "stock_in", 0, -30)],
+    air([0, 0], 5, 90),
 ))
 
 # 11. Welding table (fire standoff) -------------------------------------------
@@ -312,6 +319,7 @@ M.append(machine(
              "work apron, right"),
     ],
     [],
+    air([0, 0], 4, 90),
 ))
 
 # 14. Woodworking bench -------------------------------------------------------

@@ -62,6 +62,7 @@
         ],
         "diameter": 4
       },
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -178,6 +179,7 @@
         ],
         "diameter": 4
       },
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -283,6 +285,7 @@
         ],
         "diameter": 4
       },
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -388,6 +391,7 @@
         ],
         "diameter": 4
       },
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -504,6 +508,7 @@
         ],
         "diameter": 2.5
       },
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -603,6 +608,7 @@
         "dedicated": false
       },
       "dustPort": null,
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -685,6 +691,7 @@
         "dedicated": false
       },
       "dustPort": null,
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -772,6 +779,14 @@
         "dedicated": false
       },
       "dustPort": null,
+      "airPort": {
+        "position": [
+          -3,
+          -7
+        ],
+        "cfm": 3,
+        "psi": 90
+      },
       "clearances": [
         {
           "shape": "rect",
@@ -854,6 +869,14 @@
         "dedicated": false
       },
       "dustPort": null,
+      "airPort": {
+        "position": [
+          0,
+          0
+        ],
+        "cfm": 3,
+        "psi": 90
+      },
       "clearances": [
         {
           "shape": "rect",
@@ -941,6 +964,14 @@
           0
         ],
         "diameter": 2.5
+      },
+      "airPort": {
+        "position": [
+          0,
+          0
+        ],
+        "cfm": 5,
+        "psi": 90
       },
       "clearances": [
         {
@@ -1055,6 +1086,7 @@
         "dedicated": true
       },
       "dustPort": null,
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -1148,6 +1180,7 @@
         "dedicated": false
       },
       "dustPort": null,
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -1219,6 +1252,14 @@
         "dedicated": false
       },
       "dustPort": null,
+      "airPort": {
+        "position": [
+          0,
+          0
+        ],
+        "cfm": 4,
+        "psi": 90
+      },
       "clearances": [
         {
           "shape": "rect",
@@ -1312,6 +1353,7 @@
         "dedicated": false
       },
       "dustPort": null,
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -1383,6 +1425,7 @@
         "dedicated": true
       },
       "dustPort": null,
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -1443,6 +1486,7 @@
         "dedicated": true
       },
       "dustPort": null,
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",
@@ -1514,6 +1558,7 @@
         "dedicated": false
       },
       "dustPort": null,
+      "airPort": null,
       "clearances": [
         {
           "shape": "rect",

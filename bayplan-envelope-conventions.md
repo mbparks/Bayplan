@@ -177,7 +177,25 @@ Each machine carries a `PowerReq` (voltage, amps, phase, dedicated). When a pane
 
 Beyond the whole-panel rollup, each electrical run is assigned to a specific circuit (breaker) on its panel. Wire all assigns automatically: a machine flagged `dedicated` gets its own breaker sized to the next standard rating above its load with the eighty-percent continuous-load margin applied, and non-dedicated machines pack into shared breakers of matching voltage while each breaker stays under eighty percent of its rating. Standard breaker sizes are 15, 20, 30, 40, 50, and 60A. A circuit whose connected load exceeds eighty percent of its breaker is a warning, and one that exceeds the breaker outright is an error, as is a run whose voltage is higher than its circuit's. Assignments can be overridden per run in the utilities panel.
 
-### Dust static pressure
+### Display units
+
+The model is stored in inches throughout; `meta.units` (`imperial` or `metric`) is a display setting only. The header toggle switches every length shown in the interface, the rulers, the measuring tape, the machine width and depth fields, the room-dimension inputs, and the printed title block, between feet-and-inches and meters-and-centimeters. Because only the display converts and the stored geometry never changes, switching units back and forth is lossless. Engineering figures that are conventionally quoted in their own units regardless of shop preference, duct diameters in inches, airflow in CFM, breaker amperage, and voltage, are left as-is.
+
+### Compressed air
+
+A machine with an `airPort` draws shop air at a stated demand (CFM) and working pressure (PSI). Wire all connects each air consumer to the nearest compressor node by an air run, which routes like a dust run (an automatic L, or manual bends you place and drag). The check is a capacity rollup, not yet a pressure-drop model: the summed demand of all air consumers is compared against the total rated delivery (SCFM) of the compressors, with a warning past eighty percent and an error over capacity, plus an error for any air consumer when no compressor is present. Pipe-diameter pressure drop over distance is a future refinement, so a long air line is not yet penalized the way a long duct run is.
+
+### Receptacles and NEC grouping
+
+Outlets are placed as receptacle nodes around the room, each with a user-set voltage (120 or 240) and amperage rating. Wire all runs each outlet to the nearest panel and groups it onto a circuit the way an electrician would. A general 120V receptacle is treated as a 180VA load (NEC 220.14(I)); those pack onto a shared breaker of matching rating while the summed design load stays under eighty percent, which works out to about ten 20A outlets or eight 15A outlets per circuit. A 240V outlet, or any receptacle rated 30A or more, gets its own dedicated breaker sized to its rating, the way a range or welder receptacle would. Machine loads and receptacle loads never share a circuit. The panel main check uses these design loads, not the receptacle nameplate ratings, so a wall of 20A outlets does not read as hundreds of connected amps.
+
+### Electrical run encoding
+
+Electrical runs on the plat are drawn to be read at a glance. Color carries voltage: one hue for 120V, a distinct one for 240V. The dash pattern carries amperage, growing coarser with the breaker: a fine dash for 15A, medium for 20A, long for 30A, and a dash-dot for 50A and up. Each run is labeled at its midpoint with the letter of the circuit it belongs to, so two runs sharing a breaker read as the same circuit.
+
+### Utility visibility
+
+The three utility systems (dust, electrical, air) each have a show/hide toggle, with show-all and hide-all shortcuts. Hidden runs are also skipped by selection, so a hidden line cannot be picked or edited. Visibility is a view setting; it does not change the graph or any of the rollups, which always account for every run.
 
 The dust-run budget (effective length versus a per-diameter ceiling) is a quick screen. The primary check is a static-pressure model. The collector carries a linear fan curve running from its rated free-air airflow at zero static pressure down to its shutoff static pressure at zero airflow. Each branch imposes a system curve, static pressure rising with airflow through the branch's diameter and effective length (straight run plus elbow equivalents), using a Darcy-style friction fit for smooth metal duct. The operating airflow is where the two curves cross, found by bisection. That delivered airflow is compared against a capture target, the airflow that sustains roughly a four-thousand foot-per-minute branch velocity, and a branch that delivers less than its target is a warning. The model omits hood entry losses and treats duct as smooth metal, so it is a design aid rather than a certified calculation.
 

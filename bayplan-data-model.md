@@ -26,7 +26,7 @@ What separates BAYPLAN from a generic floor planner is three things, all of whic
 ```
 BayplanDocument
   schemaVersion     "1.0.0"
-  meta              { title, created, modified, author, units:"imperial", gridSpacing }
+  meta              { title, created, modified, author, units:"imperial"|"metric", gridSpacing }  // units is display only; model is inches
   facility          Facility        // the bounded space, shared across scenarios
   library           MachineDef[]    // definitions (types), not placements
   scenarios         Scenario[]      // current, proposed, etc.
@@ -110,6 +110,7 @@ MachineDef
   weight       number                      // for later floor-loading notes
   power        PowerReq                     // see section 8
   dustPort     { position, diameter } | null
+  airPort      { position, cfm, psi } | null // compressed-air consumer, or null
   clearances   ClearanceZone[]
   ports        WorkPoint[]                  // named material entry/exit points
 ```
@@ -117,8 +118,9 @@ MachineDef
 - `footprint` is defined in the machine's own local coordinate frame, origin at `anchor`.
 - `anchor` is the meaningful reference (blade, spindle) that placement rotates around, not the geometric centroid.
 - `ports` are the named points material-flow paths snap to (see section 9).
+- `airPort` marks a machine that draws shop air (its `cfm` demand at a working `psi`); SERVICES wires it to the nearest compressor node.
 
-Fields that a QUARTERMASTER seed may populate: `name`, `footprint`, `weight`, `power`, `dustPort`. Fields that are always BAYPLAN-native and never seeded: `clearances`, `anchor`, `ports`.
+Fields that a QUARTERMASTER seed may populate: `name`, `footprint`, `weight`, `power`, `dustPort`, `airPort`. Fields that are always BAYPLAN-native and never seeded: `clearances`, `anchor`, `ports`.
 
 ---
 
@@ -198,12 +200,13 @@ Placement
   position   Point      // facility coords of the anchor
   rotation   number     // deg
   mirrored   bool
+  size       [w, h] | undefined   // footprint override in inches; scales the def footprint about its anchor
   overrides  { footprint?, clearances?, power? }   // sparse
   locked     bool
   label                 // instance name, e.g. "Table Saw (main)"
 ```
 
-Overrides are sparse and optional. A definition change propagates to every placement unless that instance deliberately diverges. `locked` protects a placement from accidental drag once it is committed.
+Overrides are sparse and optional. A definition change propagates to every placement unless that instance deliberately diverges. `size` overrides just the footprint's width and depth, scaling the definition footprint (and the clearances and ports derived from it) about the anchor, so a placement can be sized to the actual unit on the floor without editing the shared definition. `locked` protects a placement from accidental drag once it is committed.
 
 ---
 
@@ -215,20 +218,22 @@ Utilities are modeled as a **typed graph**, not freehand lines. The graph is wha
 UtilityNode
   id
   kind      "panel" | "subpanel" | "dust_collector" | "compressor" |
-            "drop" | "junction" | "receptacle" | "light"
+            "receptacle" | "drop" | "junction" | "light"
   position
-  spec      // panel: {voltage, spaces}; collector: {cfm, staticPressure}
+  spec      // panel: {voltage, mainAmps, spaces, circuits[]}; collector: {cfm, staticPressure}; compressor: {scfm, psi}; receptacle: {voltage, amps}
 ```
 
 ```
 UtilityRun
   id
   system            "electrical" | "dust" | "air" | "data"
-  fromNode, toNode
-  polyline          Point[]     // routed path, for length + elbow inference
-  spec              // electrical:{voltage,amps,circuit}; dust:{diameter}
-  servesPlacementId
+  fromNode          // supply node (panel, collector, compressor)
+  toPlacementId | toNodeId   // a machine, or a node such as a receptacle
+  waypoints         Point[]     // manual bends on any run (dust, air, electrical); dust/air auto-route an L when absent
+  spec              // electrical:{voltage,amps,dedicated|receptacle,loadAmps,circuitId}; dust:{diameter}; air:{cfm,psi}
 ```
+
+Receptacles are load endpoints (`toNodeId`) rather than machines. A run's `loadAmps` is the design (connected) load used for circuit sizing: a machine's full amperage, or a general receptacle's 180VA (per NEC 220.14(I)), while large or 240V receptacles carry their full rating on a dedicated circuit.
 
 ```
 PowerReq   (on MachineDef)
@@ -294,7 +299,7 @@ Provenance   (on MachineDef)
 
 **QUARTERMASTER owns the fields it seeded until you edit them; BAYPLAN owns clearances always.**
 
-- Seedable from the roster: `footprint`, `name`, `weight`, `power`, `dustPort`.
+- Seedable from the roster: `footprint`, `name`, `weight`, `power`, `dustPort`, `airPort`.
 - Always BAYPLAN-native, never seeded: `clearances`, `anchor`, `ports`.
 
 ### Re-sync as three-bucket reconciliation
@@ -348,7 +353,7 @@ Establish the bounded space before anything goes in it. Trace or draw the bounda
 
 ### 2. MANIFEST: build the library
 
-Assemble the definitions of what must be stowed. Seed from QUARTERMASTER (populating `name`, `footprint`, `weight`, `power`, `dustPort` with provenance stamped) or add manual definitions. Footprints and anchors are set here; clearances are not.
+Assemble the definitions of what must be stowed. Seed from QUARTERMASTER (populating `name`, `footprint`, `weight`, `power`, `dustPort`, `airPort` with provenance stamped) or add manual definitions. Footprints and anchors are set here; clearances are not.
 
 - Touches: `library[]`, `MachineDef`, `Provenance`.
 - Gate: every machine you intend to place exists as a definition with a footprint and an anchor.
@@ -385,10 +390,10 @@ Draw flow paths that snap waypoint-to-waypoint across machine work points, then 
 
 ### 7. SERVICES: utilities graph
 
-Lay the typed graph: panels and drops, dust collector, compressor, runs between them as polylines. Read the rollups that justify the graph: connected load per circuit against panel spec, and duct-run warnings from length plus inferred elbow count.
+Lay the typed graph: panels and drops, dust collector, compressor, runs between them as polylines. Read the rollups that justify the graph: connected load per circuit against panel spec, dust-run performance from the static-pressure model, and compressed-air demand against compressor capacity. Dust and air runs can be routed by hand with manual bends; each system (dust, electrical, air) can be shown or hidden independently, or all at once, so a crowded layout can be read one utility at a time.
 
-- Touches: `UtilityNode`, `UtilityRun`; reads `PowerReq`.
-- Gate: every machine reachable by its required power and, where it has a `dustPort`, by a duct run within the collector's budget.
+- Touches: `UtilityNode`, `UtilityRun`; reads `PowerReq`, `airPort`.
+- Gate: every machine reachable by its required power, by a duct run within the collector's budget where it has a `dustPort`, and by an air line from a compressor where it has an `airPort`.
 - Closes open item: the elbow-equivalent table per diameter lives here.
 - Back-edge: STOWAGE (move the 240V machine nearer a drop).
 
