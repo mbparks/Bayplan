@@ -1,0 +1,324 @@
+{
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "title": "Untitled",
+    "units": "metric",
+    "gridSpacing": 12,
+    "revision": "A",
+    "author": "M.B. Parks",
+    "date": "2026-07-09"
+  },
+  "facility": {
+    "id": "f1",
+    "name": "Shop",
+    "boundary": {
+      "vertices": [
+        [
+          0,
+          0
+        ],
+        [
+          401,
+          -11
+        ],
+        [
+          389,
+          270
+        ],
+        [
+          3,
+          325
+        ]
+      ]
+    },
+    "ceilingHeight": 108,
+    "northOffset": 0,
+    "features": []
+  },
+  "scenarios": [
+    {
+      "id": "s1",
+      "name": "Current",
+      "placements": [
+        {
+          "id": "p101",
+          "defId": "builtin-table-saw-cabinet",
+          "position": [
+            37,
+            106
+          ],
+          "rotation": 0,
+          "mirrored": false,
+          "locked": false,
+          "label": "Table saw"
+        },
+        {
+          "id": "p102",
+          "defId": "builtin-assembly-table",
+          "position": [
+            193,
+            104
+          ],
+          "rotation": 0,
+          "mirrored": false,
+          "locked": false,
+          "label": "Assembly table"
+        }
+      ],
+      "utilityNodes": [
+        {
+          "id": "n1",
+          "kind": "compressor",
+          "position": [
+            264,
+            192
+          ],
+          "spec": {
+            "scfm": 14,
+            "psi": 135,
+            "voltage": 240,
+            "amps": 20,
+            "dedicated": true
+          },
+          "label": "Air"
+        },
+        {
+          "id": "n2",
+          "kind": "dust_collector",
+          "position": [
+            264,
+            24
+          ],
+          "spec": {
+            "cfm": 1200,
+            "staticPressure": 10,
+            "voltage": 240,
+            "amps": 15,
+            "dedicated": true
+          },
+          "label": "Collector"
+        },
+        {
+          "id": "n3",
+          "kind": "panel",
+          "position": [
+            18,
+            18
+          ],
+          "spec": {
+            "voltage": 240,
+            "mainAmps": 100,
+            "spaces": 20,
+            "circuits": [
+              {
+                "id": "ck1",
+                "label": "A",
+                "amps": 20,
+                "voltage": 240,
+                "dedicated": true,
+                "kind": "machine"
+              },
+              {
+                "id": "ck2",
+                "label": "B",
+                "amps": 30,
+                "voltage": 240,
+                "dedicated": true,
+                "kind": "machine"
+              },
+              {
+                "id": "ck3",
+                "label": "C",
+                "amps": 20,
+                "voltage": 240,
+                "dedicated": true,
+                "kind": "machine"
+              },
+              {
+                "id": "ck4",
+                "label": "D",
+                "amps": 20,
+                "voltage": 120,
+                "dedicated": false,
+                "kind": "machine"
+              },
+              {
+                "id": "ck5",
+                "label": "E",
+                "amps": 20,
+                "voltage": 120,
+                "dedicated": false,
+                "kind": "receptacle"
+              },
+              {
+                "id": "ck6",
+                "label": "F",
+                "amps": 15,
+                "voltage": 120,
+                "dedicated": false,
+                "kind": "light"
+              }
+            ]
+          },
+          "label": "Panel"
+        },
+        {
+          "id": "n4",
+          "kind": "receptacle",
+          "position": [
+            275,
+            157
+          ],
+          "spec": {
+            "voltage": 120,
+            "amps": 20
+          },
+          "label": "Outlet"
+        },
+        {
+          "id": "n5",
+          "kind": "light",
+          "position": [
+            114,
+            163
+          ],
+          "spec": {
+            "watts": 60,
+            "voltage": 120
+          },
+          "label": "Light"
+        }
+      ],
+      "utilityRuns": [
+        {
+          "id": "r1",
+          "system": "dust",
+          "fromNode": "n2",
+          "toPlacementId": "p101",
+          "spec": {
+            "diameter": 4
+          },
+          "waypoints": [
+            [
+              143,
+              35
+            ]
+          ]
+        },
+        {
+          "id": "r2",
+          "system": "electrical",
+          "fromNode": "n3",
+          "toPlacementId": "p101",
+          "spec": {
+            "voltage": 240,
+            "amps": 15,
+            "dedicated": true,
+            "loadAmps": 15
+          },
+          "circuitId": "ck1"
+        },
+        {
+          "id": "r3",
+          "system": "electrical",
+          "fromNode": "n3",
+          "toPlacementId": "p102",
+          "spec": {
+            "voltage": 120,
+            "amps": 15,
+            "dedicated": false,
+            "loadAmps": 15
+          },
+          "circuitId": "ck4"
+        },
+        {
+          "id": "r4",
+          "system": "air",
+          "fromNode": "n1",
+          "toPlacementId": "p102",
+          "spec": {
+            "cfm": 4,
+            "psi": 90
+          },
+          "waypoints": [
+            [
+              254,
+              119
+            ]
+          ]
+        },
+        {
+          "id": "r5",
+          "system": "electrical",
+          "fromNode": "n3",
+          "toNodeId": "n4",
+          "spec": {
+            "voltage": 120,
+            "amps": 20,
+            "receptacle": true,
+            "loadAmps": 1.5
+          },
+          "circuitId": "ck5"
+        },
+        {
+          "id": "r6",
+          "system": "electrical",
+          "fromNode": "n3",
+          "toNodeId": "n1",
+          "spec": {
+            "voltage": 240,
+            "amps": 20,
+            "dedicated": true,
+            "loadAmps": 20
+          },
+          "circuitId": "ck2"
+        },
+        {
+          "id": "r7",
+          "system": "electrical",
+          "fromNode": "n3",
+          "toNodeId": "n2",
+          "spec": {
+            "voltage": 240,
+            "amps": 15,
+            "dedicated": true,
+            "loadAmps": 15
+          },
+          "circuitId": "ck3"
+        },
+        {
+          "id": "r8",
+          "system": "electrical",
+          "fromNode": "n3",
+          "toNodeId": "n5",
+          "spec": {
+            "voltage": 120,
+            "watts": 40,
+            "light": true,
+            "loadAmps": 0.3333333333333333
+          },
+          "circuitId": "ck6",
+          "waypoints": [
+            [
+              79,
+              160
+            ]
+          ]
+        }
+      ],
+      "flows": [],
+      "annotations": [
+        {
+          "id": "anmrd0tkgslr",
+          "position": [
+            287,
+            178
+          ],
+          "text": "This is a note."
+        }
+      ],
+      "notes": ""
+    }
+  ],
+  "activeScenarioId": "s1"
+}

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.23 | build-marker: notes-toggle-lights-2026-07-08 -->
+<!-- BAYPLAN FI-075 | v0.0.28 | build-marker: dimensions-2026-07-08 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -137,7 +137,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.23  (notes show/hide + light fixtures utility)
+   BAYPLAN FI-075  v0.0.28  (dimension annotations: permanent dimension lines)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -348,7 +348,7 @@ const Model = {
     facility:{id:"f1",name:"Shop",boundary:{vertices:[[0,0],[288,0],[288,216],[0,216]]},
       ceilingHeight:108,northOffset:0,features:[]},
     library:SEED.library,
-    scenarios:[{id:"s1",name:"Current",placements:[],utilityNodes:[],utilityRuns:[],flows:[],annotations:[],notes:""}],
+    scenarios:[{id:"s1",name:"Current",placements:[],utilityNodes:[],utilityRuns:[],flows:[],annotations:[],dimensions:[],notes:""}],
     activeScenarioId:"s1"};},
   _sseq:1, newScenarioId(){return "s"+(++this._sseq);},
   duplicateScenario(doc){const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
@@ -430,7 +430,7 @@ const Model = {
     if(!d.facility||!Array.isArray(d.scenarios))throw new Error("Not a BAYPLAN document.");
     d.meta=d.meta||{};
     for(const s of d.scenarios){ s.placements=s.placements||[]; s.flows=s.flows||[];
-      s.utilityNodes=s.utilityNodes||[]; s.utilityRuns=s.utilityRuns||[]; s.annotations=s.annotations||[]; }
+      s.utilityNodes=s.utilityNodes||[]; s.utilityRuns=s.utilityRuns||[]; s.annotations=s.annotations||[]; s.dimensions=s.dimensions||[]; }
     d.library=SEED.library; return d;});}
 };
 
@@ -698,6 +698,118 @@ const Services = {
       .map(pair=>({item:pair[0],count:nodes.filter(n=>n.kind===pair[1]).length})).filter(e=>e.count>0);
     return {outlets,lights,wireByGauge,breakers,duct,airFt,airRuns:airRuns.length,airElbows,equipment};
   },
+  // plain-language description of what a circuit feeds
+  circuitDesc(doc,panel,circuit){
+    const sc=this.scenario(doc);
+    const runs=(sc.utilityRuns||[]).filter(r=>r.system==="electrical"&&r.fromNode===panel.id&&r.circuitId===circuit.id);
+    if(!runs.length) return "spare";
+    if(circuit.dedicated){const r=runs[0];
+      if(r.spec.receptacle) return ((r.spec.voltage||120)>=240?"240V":"120V")+" outlet";
+      if(r.toNodeId){const n=(sc.utilityNodes||[]).find(x=>x.id===r.toNodeId); return n?n.label:"load";}
+      if(r.toPlacementId){const pl=sc.placements.find(p=>p.id===r.toPlacementId); const def=pl&&Model.def(pl.defId);
+        return pl?(pl.label||(def&&def.name)||"machine"):"machine";}
+      return "load";}
+    const n=runs.length;
+    if(circuit.kind==="light") return n+" light"+(n>1?"s":"");
+    if(circuit.kind==="receptacle") return n+" outlet"+(n>1?"s":"");
+    return n+" machine"+(n>1?"s":"");
+  },
+  // panel schedule: place breakers in odd/even slots, balance the A and B legs
+  panelSchedule(doc,panel){
+    const sc=this.scenario(doc);
+    const spaces=panel.spec.spaces||20;
+    const circuits=panel.spec.circuits||[];
+    const legOf=pos=>(Math.ceil(pos/2)%2===1)?"A":"B"; // rows alternate legs; both slots in a row share a leg
+    const used=new Array(spaces+1).fill(null); let legA=0, legB=0; const overflow=[];
+    const freeSingle=(pref)=>{let any=-1; for(let p=1;p<=spaces;p++){ if(used[p])continue; if(any<0)any=p; if(legOf(p)===pref)return p;} return any;};
+    const freeDouble=()=>{ for(let p=1;p<=spaces-2;p++){ if(!used[p]&&!used[p+2]&&((p%2)===((p+2)%2)))return p;} return -1;};
+    // doubles (240V) first so adjacent pairs land cleanly, then singles onto the lighter leg
+    const ordered=circuits.slice().sort((a,b)=>(b.voltage>=240?1:0)-(a.voltage>=240?1:0));
+    for(const c of ordered){const load=this._circuitLoad(sc,panel,c.id); const desc=this.circuitDesc(doc,panel,c);
+      if(c.voltage>=240){const p=freeDouble(); if(p<0){overflow.push(c);continue;}
+        used[p]={circuit:c,load,desc,pole:2,top:true}; used[p+2]={circuit:c,load,desc,pole:2,top:false};
+        legA+=load; legB+=load;
+      } else {const leg=legA<=legB?"A":"B"; const p=freeSingle(leg); if(p<0){overflow.push(c);continue;}
+        used[p]={circuit:c,load,desc,pole:1,top:true};
+        if(legOf(p)==="A")legA+=load; else legB+=load;}
+    }
+    const slot=pos=>{const u=used[pos]; return {pos,leg:legOf(pos),
+      entry:u?{label:u.circuit.label,amps:u.circuit.amps,voltage:u.circuit.voltage,load:u.load,desc:u.desc,pole:u.pole,top:u.top}:null};};
+    const rows=[]; for(let r=1;r<=Math.ceil(spaces/2);r++){const lp=2*r-1,rp=2*r; rows.push({left:slot(lp),right:rp<=spaces?slot(rp):null});}
+    const polesUsed=circuits.reduce((t,c)=>t+(c.voltage>=240?2:1),0);
+    return {spaces,rows,legA,legB,imbalance:Math.abs(legA-legB),polesUsed,overflow,circuitCount:circuits.length};
+  },
+  SERVICE_SIZES:[60,100,125,150,200,225,400],
+  // NEC-flavored service load estimate: connected load plus 25% of the largest motor
+  serviceLoad(doc,panel){
+    const sc=this.scenario(doc);
+    const runs=(sc.utilityRuns||[]).filter(r=>r.system==="electrical"&&r.fromNode===panel.id);
+    const kindOf={}; for(const n of (sc.utilityNodes||[])) kindOf[n.id]=n.kind;
+    let connectedVA=0, largestMotorVA=0;
+    for(const r of runs){const v=r.spec.voltage||120; const va=this.loadOf(r)*v; connectedVA+=va;
+      const isMotor = r.toPlacementId || (r.toNodeId && (kindOf[r.toNodeId]==="dust_collector"||kindOf[r.toNodeId]==="compressor"));
+      if(isMotor && va>largestMotorVA) largestMotorVA=va;}
+    const serviceV=panel.spec.voltage||240;
+    const demandVA=connectedVA + 0.25*largestMotorVA;
+    const mainAmps=panel.spec.mainAmps||100;
+    const demandAmps=demandVA/serviceV;
+    const suggested=this.SERVICE_SIZES.find(s=>s>=demandAmps)||Math.ceil(demandAmps/100)*100;
+    return {connectedVA, connectedAmps:connectedVA/serviceV, largestMotorVA, demandVA, demandAmps,
+      serviceV, mainAmps, ok:demandAmps<=mainAmps,
+      headroomPct: mainAmps>0?(mainAmps-demandAmps)/mainAmps*100:0, suggestedMain:suggested};
+  },
+  // foot-candle coverage: lumen-method average, point-method relative heatmap
+  lightingCoverage(doc,opt={}){
+    const sc=this.scenario(doc); const fac=doc.facility;
+    const EFF=opt.efficacy||110, LLF=0.8, CU=0.6, H=opt.height||108; // lm/W, light-loss, coeff of utilization, mount height (in)
+    const fixtures=(sc.utilityNodes||[]).filter(n=>n.kind==="light")
+      .map(n=>({x:n.position[0],y:n.position[1],lm:(n.spec.watts||40)*EFF}));
+    if(!fixtures.length) return {has:false};
+    const V=fac.boundary.vertices; const fb=G.bounds(fac.boundary);
+    let A2=0; for(let i=0;i<V.length;i++){const a=V[i],b=V[(i+1)%V.length]; A2+=a[0]*b[1]-b[0]*a[1];}
+    const areaFt2=Math.max(1,Math.abs(A2)/2/144);
+    const totalLm=fixtures.reduce((t,f)=>t+f.lm,0);
+    const avgFc=totalLm*CU*LLF/areaFt2; // lumen method average maintained fc
+    const maxDim=Math.max(fb.maxX-fb.minX,fb.maxY-fb.minY);
+    const cell=Math.max(6,Math.round(maxDim/48));
+    const nx=Math.max(1,Math.ceil((fb.maxX-fb.minX)/cell)), ny=Math.max(1,Math.ceil((fb.maxY-fb.minY)/cell));
+    const Hft=H/12; const grid=[]; let sumPt=0, cnt=0;
+    for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){
+      const px=fb.minX+(i+0.5)*cell, py=fb.minY+(j+0.5)*cell;
+      const inside=G.pointInPolygon([px,py],V); let E=0;
+      if(inside){ for(const f of fixtures){const dx=(px-f.x)/12, dy=(py-f.y)/12; const D2=dx*dx+dy*dy+Hft*Hft;
+        E += (f.lm/Math.PI)*Hft/(D2*Math.sqrt(D2));} E*=LLF; sumPt+=E; cnt++; }
+      grid.push({px,py,inside,ptE:inside?E:0});
+    }
+    const meanPt=cnt?sumPt/cnt:1; const scale=meanPt>0?avgFc/meanPt:0;
+    let minFc=Infinity,maxFc=0,aboveGen=0,aboveTask=0;
+    for(const g of grid){ g.fc=g.inside?g.ptE*scale:null;
+      if(g.inside){minFc=Math.min(minFc,g.fc); maxFc=Math.max(maxFc,g.fc); if(g.fc>=30)aboveGen++; if(g.fc>=75)aboveTask++;} }
+    return {has:true, grid, nx, ny, cell, minX:fb.minX, minY:fb.minY, maxX:fb.maxX, maxY:fb.maxY,
+      avgFc, minFc:isFinite(minFc)?minFc:0, maxFc, pctGeneral:cnt?aboveGen/cnt*100:0, pctTask:cnt?aboveTask/cnt*100:0,
+      H, fixtures, areaFt2, count:fixtures.length, target:{general:30, task:75}};
+  },
+  // readiness punch list: aggregate every check into one categorized issue list
+  punchList(doc){
+    const items=[];
+    const groupOf=t=> /dust/i.test(t)?"Dust": /(air|compress)/i.test(t)?"Air":
+      /(circuit|panel|outlet|light|volt|load|breaker|amp|service|power|240V)/i.test(t)?"Electrical":"Utilities";
+    for(const r of Trim.compute(doc).records) items.push({sev:r.sev,text:r.text,group:"Clearances"});
+    for(const r of this.compute(doc).records) items.push({sev:r.sev,text:r.text,group:groupOf(r.text)});
+    const panels=(this.scenario(doc).utilityNodes||[]).filter(n=>n.kind==="panel");
+    for(const p of panels){
+      const sch=this.panelSchedule(doc,p);
+      if(sch.overflow.length) items.push({sev:"error",group:"Panel",text:`${p.label} has ${sch.overflow.length} circuit(s) beyond its ${sch.spaces} spaces`});
+      const sl=this.serviceLoad(doc,p);
+      if(!sl.ok) items.push({sev:"error",group:"Panel",text:`${p.label} demand ${sl.demandAmps.toFixed(0)}A exceeds the ${sl.mainAmps}A service (a ${sl.suggestedMain}A service is suggested)`});
+    }
+    const ORDER=["Clearances","Electrical","Panel","Dust","Air","Utilities"];
+    items.sort((a,b)=>(this.rankSev(b.sev)-this.rankSev(a.sev))||(ORDER.indexOf(a.group)-ORDER.indexOf(b.group)));
+    const errors=items.filter(i=>i.sev==="error").length;
+    const warnings=items.filter(i=>i.sev==="warning").length;
+    return {items, errors, warnings, clear:items.length===0};
+  },
+  rankSev(s){return s==="error"?2:s==="warning"?1:0;},
   compute(doc){
     const sc=this.scenario(doc); const recs=[]; const runs=sc.utilityRuns||[];
     // dust
@@ -1009,6 +1121,14 @@ const View = {
     }
     // facility features (columns, doors, windows)
     g+=this.featureSVG(doc, p=>this.toScreen(p), {ink:"var(--ink)",dim:"var(--ink-dim)",line:"var(--line)",hard:"var(--hard)"}, UI.selectedFeatureId);
+    // permanent dimensions
+    g+=this.dimensionSVG(sc, p=>this.toScreen(p), {dim:"var(--ink-dim)",brass:"var(--brass)",ground:"var(--ground)"}, UI.selectedDimensionId);
+    // dimension placement preview
+    if(UI.mode==="dimension" && UI.dimDraft){const A=this.toScreen(UI.dimDraft); const H=UI.dimHover?this.toScreen(UI.dimHover):A;
+      g+=`<line x1="${A[0]}" y1="${A[1]}" x2="${H[0]}" y2="${H[1]}" stroke="var(--brass)" stroke-width="1.3" stroke-dasharray="4 3" style="pointer-events:none"/>`;
+      g+=`<circle cx="${A[0]}" cy="${A[1]}" r="3.5" fill="var(--ground)" stroke="var(--brass)" stroke-width="2" style="pointer-events:none"/>`;
+      if(UI.dimHover){const d=Math.hypot(UI.dimHover[0]-UI.dimDraft[0],UI.dimHover[1]-UI.dimDraft[1]);
+        g+=`<text x="${H[0]+8}" y="${H[1]-8}" fill="var(--brass)" font-size="8.5" font-family="var(--font-mono)" style="pointer-events:none">${this.fmtLen(d)}</text>`;}}
     // plat notes (annotations): a pin plus multi-line text
     if(UI.showNotes!==false) for(const an of (sc.annotations||[])){const a=this.toScreen(an.position); const selA=an.id===UI.selectedAnnotationId;
       const lines=String(an.text||"").split("\n");
@@ -1073,6 +1193,24 @@ const View = {
     }
     return g;
   },
+  // shared dimension renderer (architectural slash ticks + distance label), used by draw and platSVG
+  dimensionSVG(sc,S,pal,selId){
+    let g="";
+    for(const dm of (sc.dimensions||[])){
+      const A=S(dm.a), B=S(dm.b); const dx=B[0]-A[0], dy=B[1]-A[1]; const len=Math.hypot(dx,dy)||1;
+      const ux=dx/len, uy=dy/len, px=-uy, py=ux; const sel=dm.id===selId;
+      const col=sel?pal.brass:pal.dim, tw=sel?1.8:1.2;
+      g+=`<line x1="${A[0].toFixed(1)}" y1="${A[1].toFixed(1)}" x2="${B[0].toFixed(1)}" y2="${B[1].toFixed(1)}" stroke="${col}" stroke-width="${tw}" style="pointer-events:none"/>`;
+      const tx=ux+px, ty=uy+py, tn=Math.hypot(tx,ty)||1, tX=tx/tn*4, tY=ty/tn*4;
+      for(const P of [A,B]) g+=`<line x1="${(P[0]-tX).toFixed(1)}" y1="${(P[1]-tY).toFixed(1)}" x2="${(P[0]+tX).toFixed(1)}" y2="${(P[1]+tY).toFixed(1)}" stroke="${col}" stroke-width="${tw}" style="pointer-events:none"/>`;
+      const distIn=Math.hypot(dm.b[0]-dm.a[0],dm.b[1]-dm.a[1]); const txt=this.fmtLen(distIn);
+      const m=[(A[0]+B[0])/2,(A[1]+B[1])/2]; const w=txt.length*4.6+8;
+      g+=`<rect x="${(m[0]-w/2).toFixed(1)}" y="${(m[1]-6).toFixed(1)}" width="${w.toFixed(1)}" height="11" rx="2" fill="${pal.ground}" fill-opacity="0.9" style="pointer-events:none"/>`;
+      g+=`<text x="${m[0].toFixed(1)}" y="${(m[1]+2).toFixed(1)}" fill="${col}" font-size="8" font-family="var(--font-mono)" text-anchor="middle" style="pointer-events:none">${txt}</text>`;
+      if(sel) for(const P of [A,B]) g+=`<circle cx="${P[0].toFixed(1)}" cy="${P[1].toFixed(1)}" r="4" fill="${pal.ground}" stroke="${pal.brass}" stroke-width="2"/>`;
+    }
+    return g;
+  },
   // standalone plat renderer for compare (screen) and print (paper); no interaction
   platSVG(doc,scId,opt={}){
     const pal = opt.palette==="print"
@@ -1121,6 +1259,7 @@ const View = {
       else if(nd.kind==="panel") g+=`<rect x="${a[0]-6}" y="${a[1]-8}" width="12" height="16" fill="${pal.power}" stroke="${pal.panel}" stroke-width="1.5"/>`;
       if(nd.kind!=="receptacle"&&nd.kind!=="light") g+=`<text x="${a[0]}" y="${a[1]-11}" fill="${pal.ink}" font-size="8" font-family="var(--font-mono)" text-anchor="middle">${nd.label}</text>`;}
     g+=this.featureSVG(doc, S, {ink:pal.ink,dim:pal.dim,line:pal.line,hard:pal.hard}, null);
+    g+=this.dimensionSVG(sc, S, {dim:pal.dim,brass:pal.brass,ground:pal.panel}, null);
     if(opt.notes!==false) for(const an of (sc.annotations||[])){const a=S(an.position); const lines=String(an.text||"").split("\n");
       g+=`<rect x="${a[0]-4}" y="${a[1]-4}" width="8" height="8" rx="1.5" fill="${pal.brass}" stroke="${pal.panel}" stroke-width="1.2"/>`;
       const tx=a[0]+8; const tsp=lines.map((ln,i)=>`<tspan x="${tx}" dy="${i===0?0:11}">${(ln||" ").replace(/&/g,"&amp;").replace(/</g,"&lt;")}</tspan>`).join("");
@@ -1173,6 +1312,7 @@ const View = {
       const w=this.screenToWorld(e.clientX,e.clientY);
       const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
       if(UI.mode==="measure"){ UI.addMeasurePt(w, e.altKey); return; }
+      if(UI.mode==="dimension"){ UI.placeDimensionPoint(w, e.altKey); return; }
       if(UI.mode==="drawwalls"){
         const pt=[Math.round(w[0]),Math.round(w[1])];
         const draft=UI.draftWalls;
@@ -1243,15 +1383,33 @@ const View = {
           UI.selectAnnotation(an.id);
           drag={annotation:an.id,offX:w[0]-an.position[0],offY:w[1]-an.position[1]};
           History.dragging=true; host.setPointerCapture(e.pointerId); return;}}}
+      // dimensions: endpoints grab, line selects
+      {const dims=sc.dimensions||[]; const segd=(p,a,b)=>{const vx=b[0]-a[0],vy=b[1]-a[1]; const L2=vx*vx+vy*vy||1;
+          let t=((p[0]-a[0])*vx+(p[1]-a[1])*vy)/L2; t=Math.max(0,Math.min(1,t));
+          return Math.hypot(p[0]-(a[0]+t*vx), p[1]-(a[1]+t*vy));};
+        for(let i=dims.length-1;i>=0;i--){const dm=dims[i];
+          for(const end of ["a","b"]){ if(Math.hypot(dm[end][0]-w[0],dm[end][1]-w[1])<12){
+            UI.selectDimension(dm.id); drag={dimension:dm.id,dimEnd:end};
+            History.dragging=true; host.setPointerCapture(e.pointerId); return;}}
+          if(segd(w,dm.a,dm.b)<8){ UI.selectDimension(dm.id);
+            drag={dimension:dm.id,dimEnd:null,offA:[w[0]-dm.a[0],w[1]-dm.a[1]],offB:[w[0]-dm.b[0],w[1]-dm.b[1]]};
+            History.dragging=true; host.setPointerCapture(e.pointerId); return;}}}
       if(hit){ UI.select(hit.id);
         if(!hit.locked){ drag={id:hit.id,offX:w[0]-hit.position[0],offY:w[1]-hit.position[1]};
           History.dragging=true; host.setPointerCapture(e.pointerId); }
       } else UI.select(null);
     });
     host.addEventListener("pointermove",e=>{
+      if(UI.mode==="dimension" && UI.dimDraft && !drag){const p=this.screenToWorld(e.clientX,e.clientY);
+        UI.dimHover=e.altKey?[p[0],p[1]]:[Math.round(p[0]),Math.round(p[1])]; this.draw(); return;}
       if(!drag)return;
       const w=this.screenToWorld(e.clientX,e.clientY);
       const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
+      if(drag.dimension){const dm=(sc.dimensions||[]).find(x=>x.id===drag.dimension); if(!dm)return;
+        const snap=v=>e.altKey?v:Math.round(v);
+        if(drag.dimEnd){ dm[drag.dimEnd]=[snap(w[0]),snap(w[1])]; }
+        else { dm.a=[snap(w[0]-drag.offA[0]),snap(w[1]-drag.offA[1])]; dm.b=[snap(w[0]-drag.offB[0]),snap(w[1]-drag.offB[1])]; }
+        this.refresh(); return;}
       if(drag.svcBendRun){let nx=w[0]-drag.offX, ny=w[1]-drag.offY;
         if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
         UI.moveDustBend(drag.svcBendRun,drag.svcBendIdx,[nx,ny]); return;}
@@ -1296,8 +1454,8 @@ const View = {
 /* ---- ui ---- */
 const UI = {
   doc:null, selectedId:null, mode:"select", activeFlowId:null, selectedFlowId:null, selectedNodeId:null,
-  selectedVertex:null, selectedFeatureId:null, draftWalls:null, selectedRunId:null, selectedAnnotationId:null, compareA:null, compareB:null, measurePts:null,
-  vis:{dust:true, electrical:true, air:true}, showNotes:true,
+  selectedVertex:null, selectedFeatureId:null, draftWalls:null, selectedRunId:null, selectedAnnotationId:null, selectedDimensionId:null, dimDraft:null, dimHover:null, compareA:null, compareB:null, measurePts:null,
+  vis:{dust:true, electrical:true, air:true}, showNotes:true, lightHeight:108,
   boot(){ if(location.hash==="#test"){Tests.run();return;}
     History.reset();
     History.onRecord=()=>this.scheduleAutosave();
@@ -1320,6 +1478,20 @@ const UI = {
   undoMeasurePt(){if(this.measurePts&&this.measurePts.length){this.measurePts.pop(); View.draw(); this.syncPanels();}},
   clearMeasure(){this.measurePts=[]; View.draw(); this.syncPanels();},
   measureTotal(){const mp=this.measurePts||[]; let t=0; for(let i=1;i<mp.length;i++)t+=Math.hypot(mp[i][0]-mp[i-1][0],mp[i][1]-mp[i-1][1]); return t;},
+  enterDimension(){this.mode="dimension"; this.dimDraft=null; this.dimHover=null;
+    this.selectedId=null; this.selectedAnnotationId=null; this.selectedDimensionId=null;
+    this.selectedFlowId=null; this.activeFlowId=null; this.selectedNodeId=null; View.draw(); this.syncPanels();},
+  exitDimension(){this.mode="select"; this.dimDraft=null; this.dimHover=null; View.draw(); this.syncPanels();},
+  placeDimensionPoint(world,free){const p=free?[world[0],world[1]]:[Math.round(world[0]),Math.round(world[1])];
+    if(!this.dimDraft){ this.dimDraft=p; View.draw(); }
+    else { this.addDimension(this.dimDraft,p); this.dimDraft=null; View.draw(); this.syncPanels(); }},
+  addDimension(a,b){const sc=Services.scenario(this.doc); if(!sc.dimensions)sc.dimensions=[];
+    const dm={id:"dm"+Date.now().toString(36)+Math.floor(Math.random()*1e3).toString(36),a:a.slice(),b:b.slice()};
+    sc.dimensions.push(dm); View.refresh(); return dm;},
+  removeDimension(id){const sc=Services.scenario(this.doc); sc.dimensions=(sc.dimensions||[]).filter(d=>d.id!==id);
+    if(this.selectedDimensionId===id)this.selectedDimensionId=null; View.refresh();},
+  selectDimension(id){this.selectedId=null; this.selectedAnnotationId=null; this.selectedNodeId=null; this.selectedRunId=null; this.selectedFeatureId=null;
+    this.selectedDimensionId=id; View.draw(); this.syncPanels();},
   enterSounding(){this.mode="sounding"; this.selectedId=null; this.selectedFlowId=null; this.activeFlowId=null;
     this.selectedNodeId=null; View.refresh();},
   exitSounding(){this.mode="select"; this.selectedVertex=null; this.selectedFeatureId=null; View.refresh();},
@@ -1434,7 +1606,7 @@ const UI = {
       b.setAttribute("aria-pressed",String(b.dataset.themeBtn===t));},
   selected(){const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
     return sc.placements.find(p=>p.id===this.selectedId)||null;},
-  select(id){this.selectedId=id; this.selectedAnnotationId=null; View.draw(); this.syncPanels();},
+  select(id){this.selectedId=id; this.selectedAnnotationId=null; this.selectedDimensionId=null; View.draw(); this.syncPanels();},
   rotate(delta){const pl=this.selected(); if(!pl||pl.locked)return;
     pl.rotation=(((pl.rotation||0)+delta)%360+360)%360; View.refresh();},
   mirror(){const pl=this.selected(); if(!pl||pl.locked)return; pl.mirrored=!pl.mirrored; View.refresh();},
@@ -1445,7 +1617,7 @@ const UI = {
     const a={id:"an"+Date.now().toString(36)+Math.floor(Math.random()*1e3).toString(36),
       position:[Math.round((fb.minX+fb.maxX)/2+off),Math.round((fb.minY+fb.maxY)/2+off)],text:"Note"};
     sc.annotations.push(a); this.selectAnnotation(a.id);},
-  selectAnnotation(id){this.selectedId=null; this.selectedNodeId=null; this.selectedRunId=null; this.selectedFeatureId=null;
+  selectAnnotation(id){this.selectedId=null; this.selectedNodeId=null; this.selectedRunId=null; this.selectedFeatureId=null; this.selectedDimensionId=null;
     this.selectedAnnotationId=id; View.refresh();
     const ta=document.querySelector('[data-an="text"]'); if(ta){ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length);}},
   setAnnotationText(id,text){const sc=Services.scenario(this.doc); const a=(sc.annotations||[]).find(x=>x.id===id);
@@ -1604,6 +1776,214 @@ const UI = {
     </div>`;
     window.print();
   },
+  panels(){return (Services.scenario(this.doc).utilityNodes||[]).filter(n=>n.kind==="panel");},
+  currentPanel(){const ps=this.panels(); return ps.find(p=>p.id===this.panelId)||ps[0]||null;},
+  showPanelSchedule(){
+    const panels=this.panels(); const panel=this.currentPanel();
+    const legColor=leg=>leg==="A"?"var(--power)":"var(--air)";
+    const legBg=leg=>leg==="A"?"rgba(154,127,184,0.10)":"rgba(95,182,201,0.10)";
+    const cell=(s)=>{ if(!s) return `<td></td>`; const e=s.entry;
+      const base=`padding:4px 7px; background:${legBg(s.leg)}; font-family:var(--font-mono); font-size:11px; border-left:3px solid ${legColor(s.leg)}`;
+      if(!e) return `<td style="${base}; color:var(--ink-dim)"><span>${s.pos}</span> <span style="opacity:.55">spare</span> <span style="float:right">${s.leg}</span></td>`;
+      if(e.pole===2&&!e.top) return `<td style="${base}; color:var(--ink-dim)"><span>${s.pos}</span> <span style="opacity:.7">\u2191 ${e.voltage}V ${e.label}</span> <span style="float:right">${s.leg}</span></td>`;
+      const lc=e.load>e.amps?"var(--hard)":e.load>0.8*e.amps?"var(--soft)":"var(--ink-dim)";
+      return `<td style="${base}"><span style="color:var(--ink-dim)">${s.pos}</span> <b>${e.label}</b> ${e.amps}A${e.pole===2?" 2p":""} <span style="color:var(--ink-dim)">${e.desc}</span> <span style="float:right; color:${lc}">${e.load.toFixed(1)}/${e.amps}A</span></td>`;};
+    let inner;
+    if(!panel){ inner=`<p class="empty" style="margin-top:14px">No panel yet. Open Utilities, add an electrical panel and your loads, then Wire all, and the schedule fills in.</p>`; }
+    else if(!(panel.spec.circuits||[]).length){ inner=`<p class="empty" style="margin-top:14px">This panel has no circuits yet. Add outlets, lights, and machines, then click Wire all in the Utilities panel.</p>`; }
+    else { const sch=Services.panelSchedule(this.doc,panel);
+      const rows=sch.rows.map(r=>`<tr>${cell(r.left)}${cell(r.right)}</tr>`).join("");
+      const legMax=Math.max(sch.legA,sch.legB,1);
+      const bar=(v,leg)=>`<div style="display:flex;align-items:center;gap:8px;margin-top:4px"><span style="width:46px;font-family:var(--font-mono);font-size:11px">Leg ${leg}</span><div style="flex:1;height:12px;background:var(--panel);border:1px solid var(--line);border-radius:3px;overflow:hidden"><div style="width:${(v/legMax*100).toFixed(0)}%;height:100%;background:${legColor(leg)};opacity:.5"></div></div><span style="width:52px;text-align:right;font-family:var(--font-mono);font-size:11px">${v.toFixed(1)}A</span></div>`;
+      const imbNote=sch.imbalance>10?`<span style="color:var(--soft)"> \u00b7 ${sch.imbalance.toFixed(1)}A off balance; consider swapping a 120V circuit's leg</span>`:` \u00b7 well balanced`;
+      inner=`
+        <div style="font-family:var(--font-mono); font-size:12px; color:var(--ink-dim); margin:2px 0 10px">${panel.label} \u00b7 ${panel.spec.voltage||240}V \u00b7 ${panel.spec.mainAmps||100}A main \u00b7 ${sch.polesUsed}/${sch.spaces} spaces used</div>
+        <table style="width:100%; border-collapse:separate; border-spacing:0 3px; table-layout:fixed">${rows}</table>
+        ${sch.overflow.length?`<p style="color:var(--hard); font-family:var(--font-mono); font-size:11px; margin-top:8px">${sch.overflow.length} circuit(s) exceed the panel's ${sch.spaces} spaces. Raise the panel space count or add a subpanel.</p>`:``}
+        <div style="margin-top:14px"><h3 style="margin:0 0 2px">Leg balance</h3>
+          <div style="font-family:var(--font-mono);font-size:11px;color:var(--ink-dim)">240V loads sit on both legs; 120V loads are split to balance${imbNote}</div>
+          ${bar(sch.legA,"A")}${bar(sch.legB,"B")}
+        </div>
+        ${(()=>{const sl=Services.serviceLoad(this.doc,panel);
+          const verdict=sl.ok
+            ? `<span style="color:var(--shared)">\u2713 the ${sl.mainAmps}A service covers this, ${sl.headroomPct.toFixed(0)}% headroom</span>`
+            : `<span style="color:var(--hard)">\u2717 exceeds the ${sl.mainAmps}A service; a ${sl.suggestedMain}A service is suggested</span>`;
+          return `<div style="margin-top:14px"><h3 style="margin:0 0 2px">Service load</h3>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:12px">
+              <tr><td style="padding:2px 0">Connected load</td><td style="text-align:right;color:var(--ink-dim)">${Math.round(sl.connectedVA).toLocaleString()} VA \u00b7 ${sl.connectedAmps.toFixed(0)}A</td></tr>
+              <tr><td style="padding:2px 0">Demand (largest motor +25%)</td><td style="text-align:right;color:var(--ink-dim)">${Math.round(sl.demandVA).toLocaleString()} VA \u00b7 ${sl.demandAmps.toFixed(0)}A @ ${sl.serviceV}V</td></tr>
+            </table>
+            <div style="margin-top:4px;font-family:var(--font-mono);font-size:12px">${verdict}</div>
+            <div style="margin-top:3px;font-family:var(--font-mono);font-size:9.5px;color:var(--ink-dim)">Planning estimate (NEC 430.24 largest-motor rule). Not a substitute for a stamped service calculation.</div></div>`;})()}
+        <div style="margin-top:14px"><button id="psPrint">Print / PDF</button></div>`;
+    }
+    const picker=panels.length>1?`<div style="margin:6px 0; display:flex; gap:6px; flex-wrap:wrap">${panels.map(p=>`<button data-panel="${p.id}" ${p===panel?'aria-pressed="true"':''}>${p.label}</button>`).join("")}</div>`:"";
+    document.getElementById("app").innerHTML=`<div id="compare">
+      <h1>Panel schedule</h1>
+      <p style="color:var(--ink-dim); font-size:12.5px; margin:0">Breaker directory for the active scenario. Odd slots are the left column, even the right; each row shares a leg (A or B), and a 240V breaker spans two slots to reach both.</p>
+      ${picker}${inner}
+      <p style="margin-top:16px"><a href="#" onclick="UI.render();return false">\u2190 back to plat</a></p>
+    </div>`;
+    for(const b of document.querySelectorAll("[data-panel]")) b.onclick=()=>{this.panelId=b.dataset.panel; this.showPanelSchedule();};
+    const pp=document.getElementById("psPrint"); if(pp)pp.onclick=()=>this.printPanel();
+  },
+  printPanel(){
+    const panel=this.currentPanel(); if(!panel||!(panel.spec.circuits||[]).length){this.showPanelSchedule();return;}
+    const sch=Services.panelSchedule(this.doc,panel); const d=this.doc.meta; if(!d.date)d.date=new Date().toISOString().slice(0,10);
+    const scn=(this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId)||{}).name||"";
+    const styleEl=document.getElementById("printPageStyle")||(()=>{const s=document.createElement("style");s.id="printPageStyle";document.head.appendChild(s);return s;})();
+    styleEl.textContent=`@media print{@page{size:8.5in 11in; margin:0.6in;}
+      #printSheet .tk{color:#141414; font-family:"Iowan Old Style",Palatino,Georgia,serif;}
+      #printSheet .tk-top{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #141414; padding-bottom:6px;}
+      #printSheet .tk-title{font-size:20px; letter-spacing:1px; margin:0;} #printSheet .tk-sub{font-size:10px; color:#555; letter-spacing:2px; text-transform:uppercase; margin:2px 0 0;}
+      #printSheet .tk-meta{font-family:ui-monospace,Menlo,monospace; font-size:9.5px; color:#444; text-align:right; line-height:1.5;}
+      #printSheet table.ps{width:100%; border-collapse:collapse; font-family:ui-monospace,Menlo,monospace; font-size:9.5px; margin-top:12px;}
+      #printSheet table.ps td{padding:3px 5px; border:1px solid #ddd; vertical-align:top;}
+      #printSheet .ps-A{border-left:3px solid #6a4f88 !important;} #printSheet .ps-B{border-left:3px solid #2b7f92 !important;}
+      #printSheet .ps-sum{margin-top:12px; font-family:ui-monospace,Menlo,monospace; font-size:10px; color:#333;}
+      #printSheet .tk-foot{margin-top:18px; border-top:1px solid #bbb; padding-top:5px; font-family:ui-monospace,Menlo,monospace; font-size:8.5px; color:#888; letter-spacing:1px; display:flex; justify-content:space-between;} }`;
+    const pcell=(s)=>{ if(!s) return `<td></td>`; const e=s.entry; const cls=s.leg==="A"?"ps-A":"ps-B";
+      if(!e) return `<td class="${cls}">${s.pos} \u00b7 spare \u00b7 ${s.leg}</td>`;
+      if(e.pole===2&&!e.top) return `<td class="${cls}">${s.pos} \u00b7 \u2191 ${e.voltage}V ${e.label} \u00b7 ${s.leg}</td>`;
+      return `<td class="${cls}">${s.pos} \u00b7 <b>${e.label}</b> ${e.amps}A${e.pole===2?" 2p":""} \u00b7 ${e.desc} \u00b7 ${e.load.toFixed(1)}/${e.amps}A</td>`;};
+    const rows=sch.rows.map(r=>`<tr>${pcell(r.left)}${pcell(r.right)}</tr>`).join("");
+    const sl=Services.serviceLoad(this.doc,panel);
+    const verdict=sl.ok?`service ${sl.mainAmps}A covers demand ${sl.demandAmps.toFixed(0)}A (${sl.headroomPct.toFixed(0)}% headroom)`
+                       :`demand ${sl.demandAmps.toFixed(0)}A exceeds ${sl.mainAmps}A service; ${sl.suggestedMain}A suggested`;
+    document.getElementById("printSheet").innerHTML=`<div class="tk">
+      <div class="tk-top"><div><h1 class="tk-title">${(d.title||'Untitled').toUpperCase()}</h1><p class="tk-sub">Panel Schedule \u00b7 ${panel.label}</p></div>
+        <div class="tk-meta">${scn?scn.toUpperCase()+'<br>':''}${d.date}<br>REV ${d.revision||'A'}<br>${panel.spec.voltage||240}V \u00b7 ${panel.spec.mainAmps||100}A</div></div>
+      <table class="ps">${rows}</table>
+      <div class="ps-sum">Leg A ${sch.legA.toFixed(1)}A \u00b7 Leg B ${sch.legB.toFixed(1)}A \u00b7 imbalance ${sch.imbalance.toFixed(1)}A \u00b7 ${sch.polesUsed}/${sch.spaces} spaces used${sch.overflow.length?` \u00b7 ${sch.overflow.length} over capacity`:''}</div>
+      <div class="ps-sum">Connected ${Math.round(sl.connectedVA).toLocaleString()} VA \u00b7 demand ${Math.round(sl.demandVA).toLocaleString()} VA \u00b7 ${verdict}</div>
+      <div class="tk-foot"><span>BAYPLAN FI-075 \u00b7 GREEN SHOE GARAGE</span><span>planning schedule; verify against the installed panel and local code</span></div>
+    </div>`;
+    window.print();
+  },
+  lightHeat(fc){const t=Math.max(0,Math.min(1,fc/100)); const a=[26,32,46],b=[255,224,138];
+    return `rgb(${Math.round(a[0]+(b[0]-a[0])*t)},${Math.round(a[1]+(b[1]-a[1])*t)},${Math.round(a[2]+(b[2]-a[2])*t)})`;},
+  lightingSVG(cov){const pad=12; const W=(cov.maxX-cov.minX)+pad*2, Hd=(cov.maxY-cov.minY)+pad*2;
+    const S=(x,y)=>[(x-cov.minX)+pad,(cov.maxY-y)+pad];
+    let g="";
+    for(const c of cov.grid){ if(!c.inside)continue; const s=S(c.px-cov.cell/2,c.py+cov.cell/2);
+      g+=`<rect x="${s[0].toFixed(1)}" y="${s[1].toFixed(1)}" width="${cov.cell+0.5}" height="${cov.cell+0.5}" fill="${this.lightHeat(c.fc)}"/>`;}
+    const bpts=this.doc.facility.boundary.vertices.map(v=>{const s=S(v[0],v[1]);return s[0].toFixed(1)+","+s[1].toFixed(1);}).join(" ");
+    g+=`<polygon points="${bpts}" fill="none" stroke="#e8e8e8" stroke-width="1.5"/>`;
+    const sc=Services.scenario(this.doc);
+    for(const pl of sc.placements){const def=Model.def(pl.defId); if(!def)continue;
+      const fp=G.footprintWorldPoly(def,pl).map(p=>{const s=S(p[0],p[1]);return s[0].toFixed(1)+","+s[1].toFixed(1);}).join(" ");
+      g+=`<polygon points="${fp}" fill="none" stroke="rgba(255,255,255,0.30)" stroke-width="0.8"/>`;
+      const c=S(pl.position[0],pl.position[1]); g+=`<text x="${c[0].toFixed(1)}" y="${c[1].toFixed(1)}" fill="rgba(255,255,255,0.65)" font-size="7" font-family="ui-monospace,monospace" text-anchor="middle">${(pl.label||def.name).replace(/</g,'&lt;')}</text>`;}
+    for(const f of cov.fixtures){const s=S(f.x,f.y); g+=`<circle cx="${s[0].toFixed(1)}" cy="${s[1].toFixed(1)}" r="2.5" fill="#fff" stroke="#333" stroke-width="0.6"/>`;}
+    return `<svg viewBox="0 0 ${W.toFixed(1)} ${Hd.toFixed(1)}" preserveAspectRatio="xMidYMid meet">${g}</svg>`;
+  },
+  showLighting(){
+    const H=this.lightHeight||108; const cov=Services.lightingCoverage(this.doc,{height:H});
+    let inner;
+    if(!cov.has){ inner=`<p class="empty" style="margin-top:14px">No light fixtures yet. Open Utilities, add a few + Light fixtures, and the coverage map fills in.</p>`; }
+    else { const heat=this.lightHeat.bind(this);
+      const legend=`<div style="display:flex;align-items:center;gap:8px;margin-top:8px;font-family:var(--font-mono);font-size:10px;color:var(--ink-dim)">
+        <span>0</span><div style="flex:1;height:10px;border-radius:3px;background:linear-gradient(90deg,${heat(0)},${heat(30)},${heat(50)},${heat(75)},${heat(100)})"></div><span>100 fc</span></div>`;
+      const avg=cov.avgFc; const verdict = avg>=50?`<span style="color:var(--shared)">well lit for general shop work</span>`
+        : avg>=30?`<span style="color:var(--soft)">adequate for general work; task areas want more</span>`
+        : `<span style="color:var(--hard)">dim; add fixtures or lower them</span>`;
+      const hv=View.uSize(H);
+      inner=`<div style="background:#12161f;border-radius:8px;padding:6px;margin-top:10px;max-height:54vh;overflow:hidden">${this.lightingSVG(cov)}</div>${legend}
+        <div style="margin-top:12px; font-family:var(--font-mono); font-size:12.5px">
+          <div>Average <b>${avg.toFixed(0)} fc</b> across ${cov.count} fixture${cov.count!==1?'s':''} \u00b7 ${verdict}</div>
+          <div style="color:var(--ink-dim); margin-top:3px">range ${cov.minFc.toFixed(0)}\u2013${cov.maxFc.toFixed(0)} fc \u00b7 ${cov.pctGeneral.toFixed(0)}% of floor \u2265 30 fc \u00b7 ${cov.pctTask.toFixed(0)}% \u2265 75 fc</div></div>
+        <div style="margin-top:12px; display:flex; gap:8px; align-items:center; font-family:var(--font-mono); font-size:12px">
+          <span>Mounting height</span><button data-lh="-">\u2212</button><span style="width:70px;text-align:center">${hv.v} ${hv.u}</span><button data-lh="+">+</button></div>
+        <div style="margin-top:4px; font-family:var(--font-mono); font-size:9.5px; color:var(--ink-dim)">Estimate: 110 lm/W, 0.6 coefficient of utilization, 0.8 light-loss factor. Average is the lumen method; the map is a point-method distribution scaled to that average.</div>
+        <div style="margin-top:12px"><button id="lgPrint">Print / PDF</button></div>`;
+    }
+    document.getElementById("app").innerHTML=`<div id="compare">
+      <h1>Lighting coverage</h1>
+      <p style="color:var(--ink-dim); font-size:12.5px; margin:0">Estimated foot-candles across the floor from the placed fixtures. Woodworking wants roughly 30\u201350 fc general and 75\u2013100 fc at the bench.</p>
+      ${inner}
+      <p style="margin-top:16px"><a href="#" onclick="UI.render();return false">\u2190 back to plat</a></p>
+    </div>`;
+    const stepH=(d)=>{ this.lightHeight=Math.max(72,Math.min(240,(this.lightHeight||108)+d*12)); this.showLighting(); };
+    const dec=document.querySelector('[data-lh="-"]'), inc=document.querySelector('[data-lh="+"]');
+    if(dec)dec.onclick=()=>stepH(-1); if(inc)inc.onclick=()=>stepH(1);
+    const lp=document.getElementById("lgPrint"); if(lp)lp.onclick=()=>this.printLighting();
+  },
+  printLighting(){
+    const H=this.lightHeight||108; const cov=Services.lightingCoverage(this.doc,{height:H});
+    if(!cov.has){this.showLighting();return;}
+    const d=this.doc.meta; if(!d.date)d.date=new Date().toISOString().slice(0,10);
+    const scn=(this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId)||{}).name||"";
+    const styleEl=document.getElementById("printPageStyle")||(()=>{const s=document.createElement("style");s.id="printPageStyle";document.head.appendChild(s);return s;})();
+    styleEl.textContent=`@media print{@page{size:8.5in 11in; margin:0.6in;}
+      #printSheet .tk{color:#141414; font-family:"Iowan Old Style",Palatino,Georgia,serif;}
+      #printSheet .tk-top{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #141414; padding-bottom:6px;}
+      #printSheet .tk-title{font-size:20px; letter-spacing:1px; margin:0;} #printSheet .tk-sub{font-size:10px; color:#555; letter-spacing:2px; text-transform:uppercase; margin:2px 0 0;}
+      #printSheet .tk-meta{font-family:ui-monospace,Menlo,monospace; font-size:9.5px; color:#444; text-align:right; line-height:1.5;}
+      #printSheet .lg-map{background:#12161f; border-radius:6px; padding:6px; margin:12px 0; break-inside:avoid;}
+      #printSheet .lg-map svg{width:100%; max-height:5in; display:block;}
+      #printSheet .lg-sum{font-family:ui-monospace,Menlo,monospace; font-size:10.5px; color:#333; line-height:1.6;}
+      #printSheet .tk-foot{margin-top:18px; border-top:1px solid #bbb; padding-top:5px; font-family:ui-monospace,Menlo,monospace; font-size:8.5px; color:#888; letter-spacing:1px; display:flex; justify-content:space-between;} }`;
+    const verdict=cov.avgFc>=50?"well lit for general shop work":cov.avgFc>=30?"adequate for general work; task areas want more":"dim; add fixtures or lower them";
+    document.getElementById("printSheet").innerHTML=`<div class="tk">
+      <div class="tk-top"><div><h1 class="tk-title">${(d.title||'Untitled').toUpperCase()}</h1><p class="tk-sub">Lighting Coverage</p></div>
+        <div class="tk-meta">${scn?scn.toUpperCase()+'<br>':''}${d.date}<br>REV ${d.revision||'A'}<br>${cov.count} fixtures</div></div>
+      <div class="lg-map">${this.lightingSVG(cov)}</div>
+      <div class="lg-sum">Average ${cov.avgFc.toFixed(0)} fc \u00b7 range ${cov.minFc.toFixed(0)}\u2013${cov.maxFc.toFixed(0)} fc \u00b7 ${cov.pctGeneral.toFixed(0)}% of floor \u2265 30 fc \u00b7 ${cov.pctTask.toFixed(0)}% \u2265 75 fc<br>${verdict}. Estimate at ${(H/12).toFixed(0)} ft mounting; 110 lm/W, CU 0.6, LLF 0.8.</div>
+      <div class="tk-foot"><span>BAYPLAN FI-075 \u00b7 GREEN SHOE GARAGE</span><span>planning estimate; not a photometric layout</span></div>
+    </div>`;
+    window.print();
+  },
+  showPunchList(){
+    const pl=Services.punchList(this.doc);
+    let inner;
+    if(pl.clear){ inner=`<div style="margin-top:34px; text-align:center">
+        <div style="font-size:46px; color:var(--shared); line-height:1">\u2713</div>
+        <div style="font-family:var(--font-mono); font-size:15px; color:var(--shared); margin-top:8px">All clear</div>
+        <div style="color:var(--ink-dim); font-size:12.5px; margin-top:8px; max-width:380px; margin-left:auto; margin-right:auto">No clearance conflicts, no unfed loads, no overloaded circuits or services, no dust or air shortfalls. This plan is ready to build.</div></div>`; }
+    else { const groups={}; for(const it of pl.items){(groups[it.group]=groups[it.group]||[]).push(it);}
+      const ORDER=["Clearances","Electrical","Panel","Dust","Air","Utilities"];
+      const dot=sev=>`<span style="color:${sev==="error"?"var(--hard)":"var(--soft)"}">\u25c9</span>`;
+      const secs=ORDER.filter(g=>groups[g]).map(g=>`<div style="margin-top:14px"><h3 style="margin:0 0 4px">${g}</h3>
+        ${groups[g].map(it=>`<div style="display:flex; gap:8px; padding:3px 0; font-family:var(--font-mono); font-size:12.5px"><span>${dot(it.sev)}</span><span>${it.text.replace(/</g,"&lt;")}</span></div>`).join("")}</div>`).join("");
+      inner=`<div style="font-family:var(--font-mono); font-size:12.5px; margin:6px 0 2px">
+          <span style="color:var(--hard)">${pl.errors} error${pl.errors!==1?'s':''}</span> \u00b7 <span style="color:var(--soft)">${pl.warnings} warning${pl.warnings!==1?'s':''}</span></div>
+        ${secs}
+        <div style="margin-top:16px"><button id="plPrint">Print / PDF</button></div>`;
+    }
+    document.getElementById("app").innerHTML=`<div id="compare">
+      <h1>Readiness</h1>
+      <p style="color:var(--ink-dim); font-size:12.5px; margin:0">Everything the plan flags, in one place: clearance conflicts, unfed or overloaded circuits, dust and air shortfalls, panel and service capacity. Clear the list before you build.</p>
+      ${inner}
+      <p style="margin-top:16px"><a href="#" onclick="UI.render();return false">\u2190 back to plat</a></p>
+    </div>`;
+    const pp=document.getElementById("plPrint"); if(pp)pp.onclick=()=>this.printPunch();
+  },
+  printPunch(){
+    const pl=Services.punchList(this.doc); const d=this.doc.meta; if(!d.date)d.date=new Date().toISOString().slice(0,10);
+    const scn=(this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId)||{}).name||"";
+    const styleEl=document.getElementById("printPageStyle")||(()=>{const s=document.createElement("style");s.id="printPageStyle";document.head.appendChild(s);return s;})();
+    styleEl.textContent=`@media print{@page{size:8.5in 11in; margin:0.6in;}
+      #printSheet .tk{color:#141414; font-family:"Iowan Old Style",Palatino,Georgia,serif;}
+      #printSheet .tk-top{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #141414; padding-bottom:6px;}
+      #printSheet .tk-title{font-size:20px; letter-spacing:1px; margin:0;} #printSheet .tk-sub{font-size:10px; color:#555; letter-spacing:2px; text-transform:uppercase; margin:2px 0 0;}
+      #printSheet .tk-meta{font-family:ui-monospace,Menlo,monospace; font-size:9.5px; color:#444; text-align:right; line-height:1.5;}
+      #printSheet .pl-sec{break-inside:avoid; margin-top:12px;} #printSheet .pl-sec h3{font-size:11px; letter-spacing:2px; text-transform:uppercase; border-bottom:1px solid #bbb; padding-bottom:3px; margin:0 0 4px;}
+      #printSheet .pl-row{display:flex; gap:7px; padding:3px 0; font-family:ui-monospace,Menlo,monospace; font-size:11px;}
+      #printSheet .pl-box{font-size:13px;} #printSheet .pl-e{color:#b02318;} #printSheet .pl-w{color:#9a6a12;}
+      #printSheet .tk-foot{margin-top:18px; border-top:1px solid #bbb; padding-top:5px; font-family:ui-monospace,Menlo,monospace; font-size:8.5px; color:#888; letter-spacing:1px; display:flex; justify-content:space-between;} }`;
+    let body;
+    if(pl.clear) body=`<p style="font-family:ui-monospace,monospace; font-size:12px; color:#2f7d4a; margin-top:16px">\u2713 All clear. No clearance conflicts, unfed loads, overloaded circuits or services, or dust and air shortfalls. Ready to build.</p>`;
+    else { const groups={}; for(const it of pl.items){(groups[it.group]=groups[it.group]||[]).push(it);}
+      const ORDER=["Clearances","Electrical","Panel","Dust","Air","Utilities"];
+      body=ORDER.filter(g=>groups[g]).map(g=>`<div class="pl-sec"><h3>${g}</h3>${groups[g].map(it=>`<div class="pl-row"><span class="pl-box">\u2610</span><span class="${it.sev==="error"?"pl-e":"pl-w"}">[${it.sev==="error"?"!":"\u25b3"}]</span><span>${it.text.replace(/</g,"&lt;")}</span></div>`).join("")}</div>`).join("");}
+    document.getElementById("printSheet").innerHTML=`<div class="tk">
+      <div class="tk-top"><div><h1 class="tk-title">${(d.title||'Untitled').toUpperCase()}</h1><p class="tk-sub">Readiness Punch List</p></div>
+        <div class="tk-meta">${scn?scn.toUpperCase()+'<br>':''}${d.date}<br>REV ${d.revision||'A'}<br>${pl.errors} err \u00b7 ${pl.warnings} warn</div></div>
+      ${body}
+      <div class="tk-foot"><span>BAYPLAN FI-075 \u00b7 GREEN SHOE GARAGE</span><span>clear before install; verify against field conditions and local code</span></div>
+    </div>`;
+    window.print();
+  },
   printSetup(){
     if(!this.printOpts) this.printOpts={paper:"letter",orient:"auto",scale:"fit"};
     const o=this.printOpts;
@@ -1667,6 +2047,9 @@ const UI = {
   render(){
     const lib=Model.library();
     const scenarios=this.doc.scenarios; const activeSc=this.doc.activeScenarioId;
+    let pl; try{pl=Services.punchList(this.doc);}catch(_){pl={clear:true,errors:0,warnings:0};}
+    const readyBadge=pl.clear?`\u2713 Ready`:`\u26a0 ${pl.errors+pl.warnings} Ready`;
+    const readyColor=pl.clear?"var(--shared)":pl.errors?"var(--hard)":"var(--soft)";
     document.getElementById("app").innerHTML=`
       <header>
         <span class="wordmark">BAYPLAN</span><span class="fi">FI-075</span>
@@ -1682,6 +2065,7 @@ const UI = {
           <button id="noteBtn" title="Add a note to the plat">+ Note</button>
           <button id="notesVisBtn" title="Show or hide notes" aria-pressed="${this.showNotes!==false}">${this.showNotes!==false?"\u25c9":"\u25ef"} Notes</button>
           <button id="measureBtn">Measure</button>
+          <button id="dimBtn" title="Add a dimension line">+ Dim</button>
           <span class="seg" role="group" aria-label="Units">
             <button data-units-btn="imperial" aria-pressed="${this.units()!=='metric'}">in</button>
             <button data-units-btn="metric" aria-pressed="${this.units()==='metric'}">cm</button>
@@ -1689,6 +2073,9 @@ const UI = {
           <button id="compareBtn" ${scenarios.length<2?'disabled':''}>Compare</button>
           <button id="printBtn">Print</button>
           <button id="takeoffBtn" title="Materials shopping list">Takeoff</button>
+          <button id="panelBtn" title="Panel schedule">Panel</button>
+          <button id="lightingBtn" title="Lighting coverage">Lighting</button>
+          <button id="checkBtn" title="Readiness punch list" style="color:${readyColor}">${readyBadge}</button>
           <button id="newBtn">New</button>
           <button id="importBtn">Import</button>
           <button id="exportBtn">Export</button>
@@ -1739,9 +2126,13 @@ const UI = {
     document.getElementById("noteBtn").onclick=()=>{this.mode="select"; this.showNotes=true; this.addAnnotation();};
     document.getElementById("notesVisBtn").onclick=()=>this.toggleNotes();
     document.getElementById("measureBtn").onclick=()=>this.enterMeasure();
+    document.getElementById("dimBtn").onclick=()=>this.enterDimension();
     document.getElementById("compareBtn").onclick=()=>this.showCompare();
     document.getElementById("printBtn").onclick=()=>this.printSetup();
     document.getElementById("takeoffBtn").onclick=()=>this.showTakeoff();
+    document.getElementById("panelBtn").onclick=()=>this.showPanelSchedule();
+    document.getElementById("lightingBtn").onclick=()=>this.showLighting();
+    document.getElementById("checkBtn").onclick=()=>this.showPunchList();
     for(const b of document.querySelectorAll("[data-scenario]")) b.onclick=()=>this.switchScenario(b.dataset.scenario);
     document.getElementById("importBtn").onclick=()=>{const inp=document.createElement("input");
       inp.type="file"; inp.accept=".json";
@@ -1762,6 +2153,11 @@ const UI = {
       if(this.mode==="measure"){
         if(e.key==="Escape")this.exitMeasure();
         else if(e.key==="Backspace"){this.undoMeasurePt(); e.preventDefault();}
+        return;
+      }
+      if(this.mode==="dimension"){
+        if(e.key==="Escape"){ if(this.dimDraft){this.dimDraft=null; View.draw();} else this.exitDimension(); }
+        else if(e.key==="Backspace"){ if(this.dimDraft){this.dimDraft=null; View.draw();} e.preventDefault(); }
         return;
       }
       if(this.mode==="drawwalls"){
@@ -1790,7 +2186,10 @@ const UI = {
       }
       if(this.mode==="route"){ if(e.key==="Escape")this.doneRouting();
         else if(e.key==="Backspace"){this.undoWaypoint();e.preventDefault();} return; }
-      if(e.key==="Escape"){this.select(null); if(this.selectedAnnotationId){this.selectedAnnotationId=null; View.refresh();} return;}
+      if(e.key==="Escape"){this.select(null); if(this.selectedAnnotationId){this.selectedAnnotationId=null; View.refresh();} if(this.selectedDimensionId){this.selectedDimensionId=null; View.refresh();} return;}
+      if(this.selectedDimensionId){
+        if(e.key==="Delete"||e.key==="Backspace"){this.removeDimension(this.selectedDimensionId);e.preventDefault();}
+        return; }
       if(this.selectedAnnotationId){
         if(e.key==="Delete"||e.key==="Backspace"){this.removeAnnotation(this.selectedAnnotationId);e.preventDefault();}
         return; }
@@ -1810,7 +2209,16 @@ const UI = {
     const sw=document.getElementById("selWrap"); if(!sw)return;
     const pl=this.selected();
     const ann=this.selectedAnnotationId ? ((Services.scenario(this.doc).annotations||[]).find(a=>a.id===this.selectedAnnotationId)) : null;
-    if(ann){
+    const dim=this.selectedDimensionId ? ((Services.scenario(this.doc).dimensions||[]).find(x=>x.id===this.selectedDimensionId)) : null;
+    if(dim){const dist=Math.hypot(dim.b[0]-dim.a[0],dim.b[1]-dim.a[1]);
+      sw.innerHTML=`<h2>Dimension</h2>
+        <div class="selpanel">
+          <div class="name" style="font-size:18px">${View.fmtLen(dist)}</div>
+          <div class="row" style="margin-top:8px"><button data-dm="del" class="danger" style="width:100%">Remove</button></div>
+          <div style="margin-top:8px; font-family:var(--font-mono); font-size:10px; color:var(--ink-dim)">drag either end to adjust \u00b7 drag the line to move</div>
+        </div>`;
+      sw.querySelector('[data-dm="del"]').onclick=()=>this.removeDimension(dim.id);
+    } else if(ann){
       sw.innerHTML=`<h2>Note</h2>
         <div class="selpanel">
           <textarea data-an="text" placeholder="Type a note\u2026" style="width:100%; height:76px; box-sizing:border-box; font-family:var(--font-mono); font-size:12px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:6px; resize:vertical">${(ann.text||"").replace(/</g,"&lt;")}</textarea>
@@ -2158,6 +2566,8 @@ const UI = {
       ? "routing: click machines in order \u00b7 click empty floor for a bend \u00b7 Esc or Done to finish"
       : this.mode==="measure"
       ? "measure: click points to lay a tape \u00b7 Backspace removes the last \u00b7 Esc to finish"
+      : this.mode==="dimension"
+      ? "dimension: click two points to place a dimension line \u00b7 keep clicking to add more \u00b7 Esc to finish"
       : this.mode==="services"
       ? "utilities: drag nodes \u00b7 click a run to select \u00b7 click along a dust run to add a bend \u00b7 Esc to finish"
       : this.mode==="drawwalls"
@@ -2492,6 +2902,55 @@ const Tests = {
       this.ok("LIGHTS: a light with no panel is an error",Services.compute(d).records.some(x=>/light fixtures are placed but no panel/.test(x.text)));})();
     (()=>{const d=Model.demo(); d.scenarios[0].annotations=[{id:"a1",position:[50,50],text:"noteZ"}];
       this.ok("NOTES: the plat can show or hide notes",/noteZ/.test(View.platSVG(d,"s1",{palette:"print",notes:true}).svg)&&!/noteZ/.test(View.platSVG(d,"s1",{palette:"print",notes:false}).svg));})();
+    // v0.0.24: panel schedule
+    (()=>{const d=Model.demo(); Model.addNode(d,"panel");
+      for(let i=0;i<8;i++){const o=Model.addNode(d,"receptacle");o.spec={voltage:120,amps:20};}
+      for(let i=0;i<6;i++)Model.addNode(d,"light");
+      const big=Model.addNode(d,"receptacle"); big.spec={voltage:240,amps:50};
+      Services.wireAll(d); const panel=Services.scenario(d).utilityNodes.find(n=>n.kind==="panel");
+      const sch=Services.panelSchedule(d,panel);
+      this.ok("PANEL: a 240V breaker spans two same-column slots",(()=>{let top=null,cont=null;
+        for(const r of sch.rows)for(const s of [r.left,r.right]){if(s&&s.entry&&s.entry.voltage>=240){if(s.entry.top)top=s;else cont=s;}}
+        return top&&cont&&cont.pos===top.pos+2;})());
+      this.ok("PANEL: legs balance the 120V load",sch.imbalance<=Math.max(sch.legA,sch.legB));
+      this.ok("PANEL: poles used counts singles and doubles",sch.polesUsed===panel.spec.circuits.filter(c=>c.voltage<240).length+2*panel.spec.circuits.filter(c=>c.voltage>=240).length);
+      const lc=panel.spec.circuits.find(c=>c.kind==="light");
+      this.ok("PANEL: a light circuit is described by fixture count",lc?/light/.test(Services.circuitDesc(d,panel,lc)):true);})();
+    // v0.0.25: service load calc
+    (()=>{const d=Model.demo(); const p=Model.addNode(d,"panel"); p.spec={voltage:240,mainAmps:100,spaces:20};
+      for(let i=0;i<4;i++){const o=Model.addNode(d,"receptacle");o.spec={voltage:120,amps:20};}
+      Services.wireAll(d); const sl=Services.serviceLoad(d,p);
+      this.ok("SERVICE: connected load is positive and demand adds the largest motor",sl.connectedVA>0&&sl.demandVA>=sl.connectedVA);
+      this.ok("SERVICE: a 100A service covers a modest shop",sl.ok);})();
+    (()=>{const d=Model.demo(); const p=Model.addNode(d,"panel"); p.spec={voltage:240,mainAmps:60,spaces:40};
+      for(let i=0;i<6;i++){const o=Model.addNode(d,"receptacle");o.spec={voltage:240,amps:50};}
+      Services.wireAll(d); const sl=Services.serviceLoad(d,p);
+      this.ok("SERVICE: an overloaded service is flagged and a larger one suggested",!sl.ok&&sl.suggestedMain>60);})();
+    // v0.0.26: lighting coverage
+    this.ok("LIGHTING: no fixtures reports has:false",Services.lightingCoverage(Model.demo()).has===false);
+    (()=>{const d=Model.demo(); const fb=G.bounds(d.facility.boundary);
+      for(let i=0;i<24;i++){const n=Model.addNode(d,"light"); n.spec={watts:60,voltage:120};
+        n.position=[fb.minX+20+(i%6)*((fb.maxX-fb.minX-40)/5), fb.minY+20+Math.floor(i/6)*((fb.maxY-fb.minY-40)/3)];}
+      const cov=Services.lightingCoverage(d,{height:108});
+      this.ok("LIGHTING: coverage yields an average and a grid",cov.has&&isFinite(cov.avgFc)&&cov.grid.length>0);
+      this.ok("LIGHTING: average is independent of mounting height",Math.abs(cov.avgFc-Services.lightingCoverage(d,{height:84}).avgFc)<0.01);
+      this.ok("LIGHTING: coverage percentages are bounded",cov.pctGeneral>=0&&cov.pctGeneral<=100&&cov.pctTask>=0&&cov.pctTask<=100&&cov.grid.every(g=>g.fc===null||isFinite(g.fc)));})();
+    // v0.0.27: readiness punch list
+    this.ok("READY: an empty plan is all clear",Services.punchList(Model.emptyFacility()).clear===true);
+    (()=>{const d=Model.emptyFacility(); Model.addNode(d,"light"); Model.addNode(d,"dust_collector");
+      const p=Services.punchList(d); this.ok("READY: unfed loads surface as errors",!p.clear&&p.errors>=1);})();
+    (()=>{const d=Model.demo(); const pn=Model.addNode(d,"panel"); pn.spec={voltage:240,mainAmps:60,spaces:4};
+      for(let i=0;i<10;i++){const o=Model.addNode(d,"receptacle");o.spec={voltage:240,amps:50};}
+      Services.wireAll(d); const p=Services.punchList(d);
+      this.ok("READY: a service overload shows in the Panel group",p.items.some(i=>i.group==="Panel"&&/service/i.test(i.text)));
+      this.ok("READY: errors sort ahead of warnings",(()=>{let w=false;for(const it of p.items){if(it.sev==="warning")w=true;if(it.sev==="error"&&w)return false;}return true;})());})();
+    // v0.0.28: dimension annotations
+    (()=>{const d=Model.demo(); d.scenarios[0].dimensions=[{id:"dm1",a:[0,0],b:[48,0]}];
+      const out=Object.assign({},d); delete out.library; const back=JSON.parse(JSON.stringify(out)); back.library=SEED.library;
+      this.ok("DIM: dimensions survive export/import",back.scenarios[0].dimensions[0].b[0]===48);
+      this.ok("DIM: the printed plat renders the dimension",/<line /.test(View.platSVG(d,"s1",{palette:"print"}).svg));
+      const r=History.restore(History.snapshot(d));
+      this.ok("DIM: dimensions survive snapshot/restore",r.scenarios[0].dimensions.length===1);})();
     // PLAT
     (()=>{const d=Model.emptyFacility();
       d.scenarios[0].placements=[{id:"a",defId:"builtin-drill-press",position:[100,100],rotation:0,mirrored:false}];

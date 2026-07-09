@@ -276,6 +276,7 @@ Scenario
   utilityRuns   UtilityRun[]
   flows         FlowPath[]
   annotations   Annotation[]   // free text notes pinned on the plat
+  dimensions    Dimension[]    // permanent dimension lines
   notes                        // scenario-level free text (metadata)
 ```
 
@@ -285,6 +286,14 @@ Annotation
   position   Point      // facility coords of the pin
   text                  // may contain newlines; rendered multi-line
 ```
+
+```
+Dimension
+  id
+  a, b       Point      // the two measured points (facility coords)
+```
+
+A dimension is a permanent measured line between two points, drawn with architectural slash ticks and a distance label that recomputes from the endpoints and follows the unit setting. It is distinct from the transient measuring tape (which leaves nothing behind); dimensions belong to the scenario and ride through export, import, autosave, and the printed plat. Both endpoints are draggable, and the line can be grabbed to move as a whole.
 
 An annotation is a note pinned to a point on the floor: a draggable marker plus its text, selectable and editable like any other object. Notes belong to the scenario, so each arrangement carries its own, and they ride through export, import, autosave, and the printed plat with everything else. Tool tags are not a separate structure: a `Placement.label` is the machine's instance name, so two of the same saw can be told apart ("Table saw (main)" versus "Table saw (outfeed)") on screen, in the on-floor list, and on the plat.
 
