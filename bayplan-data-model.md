@@ -218,9 +218,9 @@ Utilities are modeled as a **typed graph**, not freehand lines. The graph is wha
 UtilityNode
   id
   kind      "panel" | "subpanel" | "dust_collector" | "compressor" |
-            "receptacle" | "drop" | "junction" | "light"
+            "receptacle" | "light" | "drop" | "junction"
   position
-  spec      // panel: {voltage, mainAmps, spaces, circuits[]}; collector: {cfm, staticPressure}; compressor: {scfm, psi}; receptacle: {voltage, amps}
+  spec      // panel: {voltage, mainAmps, spaces, circuits[]}; collector: {cfm, staticPressure, voltage, amps, dedicated}; compressor: {scfm, psi, voltage, amps, dedicated}; receptacle: {voltage, amps}; light: {watts, voltage}
 ```
 
 ```
@@ -228,12 +228,12 @@ UtilityRun
   id
   system            "electrical" | "dust" | "air" | "data"
   fromNode          // supply node (panel, collector, compressor)
-  toPlacementId | toNodeId   // a machine, or a node such as a receptacle
+  toPlacementId | toNodeId   // a machine, or a node such as a receptacle, collector, or compressor
   waypoints         Point[]     // manual bends on any run (dust, air, electrical); dust/air auto-route an L when absent
   spec              // electrical:{voltage,amps,dedicated|receptacle,loadAmps,circuitId}; dust:{diameter}; air:{cfm,psi}
 ```
 
-Receptacles are load endpoints (`toNodeId`) rather than machines. A run's `loadAmps` is the design (connected) load used for circuit sizing: a machine's full amperage, or a general receptacle's 180VA (per NEC 220.14(I)), while large or 240V receptacles carry their full rating on a dedicated circuit.
+Receptacles are load endpoints (`toNodeId`) rather than machines. Collectors and compressors are both a service source (dust or air runs originate at them) and an electrical load: they carry a power spec and Wire all pulls a dedicated circuit to each from the nearest panel, the same as a large machine. Light fixtures are electrical loads too, specified by wattage; Wire all runs each to the nearest panel and groups them onto shared 15A lighting circuits by their connected watts. A run's `loadAmps` is the design (connected) load used for circuit sizing: a machine's or service node's full amperage, a luminaire's watts over its voltage, or a general receptacle's 180VA (per NEC 220.14(I)), while large or 240V receptacles carry their full rating on a dedicated circuit.
 
 ```
 PowerReq   (on MachineDef)
@@ -275,8 +275,18 @@ Scenario
   utilityNodes  UtilityNode[]
   utilityRuns   UtilityRun[]
   flows         FlowPath[]
-  notes
+  annotations   Annotation[]   // free text notes pinned on the plat
+  notes                        // scenario-level free text (metadata)
 ```
+
+```
+Annotation
+  id
+  position   Point      // facility coords of the pin
+  text                  // may contain newlines; rendered multi-line
+```
+
+An annotation is a note pinned to a point on the floor: a draggable marker plus its text, selectable and editable like any other object. Notes belong to the scenario, so each arrangement carries its own, and they ride through export, import, autosave, and the printed plat with everything else. Tool tags are not a separate structure: a `Placement.label` is the machine's instance name, so two of the same saw can be told apart ("Table saw (main)" versus "Table saw (outfeed)") on screen, in the on-floor list, and on the plat.
 
 Scenario-compare is a clean diff: same `library`, same `facility`, different placement/utility/flow sets. Side-by-side render plus a small delta summary (machines moved, conflicts resolved or introduced, total flow distance change) falls straight out of this structure.
 

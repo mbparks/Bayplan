@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.19 | build-marker: takeoff-2026-07-08 -->
+<!-- BAYPLAN FI-075 | v0.0.23 | build-marker: notes-toggle-lights-2026-07-08 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -137,7 +137,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.19  (materials takeoff / shopping list)
+   BAYPLAN FI-075  v0.0.23  (notes show/hide + light fixtures utility)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -348,7 +348,7 @@ const Model = {
     facility:{id:"f1",name:"Shop",boundary:{vertices:[[0,0],[288,0],[288,216],[0,216]]},
       ceilingHeight:108,northOffset:0,features:[]},
     library:SEED.library,
-    scenarios:[{id:"s1",name:"Current",placements:[],utilityNodes:[],utilityRuns:[],flows:[],notes:""}],
+    scenarios:[{id:"s1",name:"Current",placements:[],utilityNodes:[],utilityRuns:[],flows:[],annotations:[],notes:""}],
     activeScenarioId:"s1"};},
   _sseq:1, newScenarioId(){return "s"+(++this._sseq);},
   duplicateScenario(doc){const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
@@ -383,16 +383,19 @@ const Model = {
   addNode(doc,kind){const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
     const fb=G.bounds(doc.facility.boundary);
     const nrec=sc.utilityNodes.filter(n=>n.kind==="receptacle").length;
+    const nlt=sc.utilityNodes.filter(n=>n.kind==="light").length;
     const pos=kind==="dust_collector"?[Math.round(fb.maxX-24),Math.round(fb.minY+24)]
              :kind==="compressor"?[Math.round(fb.maxX-24),Math.round(fb.maxY-24)]
              :kind==="receptacle"?[Math.round(fb.minX+6),Math.round(fb.minY+30+nrec*18)]
+             :kind==="light"?[Math.round((fb.minX+fb.maxX)/2+(nlt%3-1)*40),Math.round((fb.minY+fb.maxY)/2+Math.floor(nlt/3)*40)]
              :[Math.round(fb.minX+18),Math.round(fb.minY+18)];
-    const spec=kind==="dust_collector"?{cfm:1200,staticPressure:10}
+    const spec=kind==="dust_collector"?{cfm:1200,staticPressure:10,voltage:240,amps:15,dedicated:true}
              :kind==="panel"?{voltage:240,mainAmps:100,spaces:20}
-             :kind==="compressor"?{scfm:14,psi:135}
-             :kind==="receptacle"?{voltage:120,amps:20}:{};
+             :kind==="compressor"?{scfm:14,psi:135,voltage:240,amps:20,dedicated:true}
+             :kind==="receptacle"?{voltage:120,amps:20}
+             :kind==="light"?{watts:40,voltage:120}:{};
     const node={id:this.newNodeId(),kind,position:pos,spec,
-      label:kind==="dust_collector"?"Collector":kind==="panel"?"Panel":kind==="compressor"?"Air":kind==="receptacle"?"Outlet":kind};
+      label:kind==="dust_collector"?"Collector":kind==="panel"?"Panel":kind==="compressor"?"Air":kind==="receptacle"?"Outlet":kind==="light"?"Light":kind};
     sc.utilityNodes.push(node); return node;},
   removeNode(doc,id){const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
     sc.utilityNodes=sc.utilityNodes.filter(n=>n.id!==id);
@@ -418,12 +421,16 @@ const Model = {
     else {f.position=[cx,cy]; f.width=36; f.facing=0;}
     doc.facility.features.push(f); return f;},
   removeFeature(doc,id){doc.facility.features=doc.facility.features.filter(f=>f.id!==id);},
-  export(doc){const blob=new Blob([JSON.stringify(doc,null,2)],{type:"application/json"});
+  export(doc){const out=Object.assign({},doc); delete out.library; // library is the built-in seed, reattached on load
+    const blob=new Blob([JSON.stringify(out,null,2)],{type:"application/json"});
     const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
     a.download=(doc.meta.title||"bayplan").replace(/\s+/g,"-").toLowerCase()+".bayplan.json";
     a.click(); URL.revokeObjectURL(a.href);},
   import(file){return file.text().then(t=>{const d=JSON.parse(t);
     if(!d.facility||!Array.isArray(d.scenarios))throw new Error("Not a BAYPLAN document.");
+    d.meta=d.meta||{};
+    for(const s of d.scenarios){ s.placements=s.placements||[]; s.flows=s.flows||[];
+      s.utilityNodes=s.utilityNodes||[]; s.utilityRuns=s.utilityRuns||[]; s.annotations=s.annotations||[]; }
     d.library=SEED.library; return d;});}
 };
 
@@ -582,7 +589,17 @@ const Services = {
     if(panels.length){for(const nd of sc.utilityNodes.filter(n=>n.kind==="receptacle")){
       const p=nearest(panels,nd.position);
       sc.utilityRuns.push({id:"r"+(++rid),system:"electrical",fromNode:p.id,toNodeId:nd.id,
-        spec:{voltage:nd.spec.voltage||120,amps:nd.spec.amps||20,receptacle:true}});}}
+        spec:{voltage:nd.spec.voltage||120,amps:nd.spec.amps||20,receptacle:true}});}
+    // powered service nodes (collector, compressor) each pull a dedicated circuit
+    for(const nd of sc.utilityNodes.filter(n=>(n.kind==="dust_collector"||n.kind==="compressor")&&n.spec&&n.spec.amps)){
+      const p=nearest(panels,nd.position);
+      sc.utilityRuns.push({id:"r"+(++rid),system:"electrical",fromNode:p.id,toNodeId:nd.id,
+        spec:{voltage:nd.spec.voltage||240,amps:nd.spec.amps,dedicated:true}});}
+    // light fixtures share lighting circuits
+    for(const nd of sc.utilityNodes.filter(n=>n.kind==="light")){
+      const p=nearest(panels,nd.position);
+      sc.utilityRuns.push({id:"r"+(++rid),system:"electrical",fromNode:p.id,toNodeId:nd.id,
+        spec:{voltage:nd.spec.voltage||120,watts:nd.spec.watts||40,light:true}});}}
     this.assignCircuits(doc);
   },
   clearRuns(doc){this.scenario(doc).utilityRuns=[];},
@@ -591,9 +608,11 @@ const Services = {
   standardBreaker(amps){for(const b of this.STD_BREAKERS) if(b>=amps) return b; return Math.ceil(amps/10)*10;},
   // design (connected) load an electrical run puts on its circuit
   loadOf(r){const v=r.spec.voltage||120, a=r.spec.amps||0;
+    if(r.spec.light) return (r.spec.watts||0)/v; // luminaire connected load from wattage
     if(r.spec.receptacle){ if(v>=240||a>=30) return a; return this.RECEPT_VA/v; } // general receptacle: 180VA
     return a;},
   isDedicatedRun(r){const v=r.spec.voltage||120,a=r.spec.amps||0;
+    if(r.spec.light) return false; // lights share a lighting circuit
     if(r.spec.receptacle) return (v>=240||a>=30); // large/240V outlets get their own circuit
     return !!r.spec.dedicated;},
   // assign each electrical run to a circuit per NEC: dedicated loads get their own breaker;
@@ -609,13 +628,13 @@ const Services = {
       // dedicated first, so shared circuits pack the leftovers
       runs.sort((a,b)=>(this.isDedicatedRun(b)?1:0)-(this.isDedicatedRun(a)?1:0));
       for(const r of runs){const v=r.spec.voltage||120, a=r.spec.amps||0, load=r.spec.loadAmps;
-        const kind=r.spec.receptacle?"receptacle":"machine";
+        const kind=r.spec.light?"light":r.spec.receptacle?"receptacle":"machine";
         if(this.isDedicatedRun(r)){
           const br=r.spec.receptacle?this.standardBreaker(a):this.standardBreaker(Math.ceil(a/0.8));
           const c={id:"ck"+(++cseq),label:letter(p.spec.circuits.length),amps:br,voltage:v,dedicated:true,kind};
           p.spec.circuits.push(c); r.circuitId=c.id;
         } else {
-          const wantBr=r.spec.receptacle?(a||20):(v>=240?30:20);
+          const wantBr=r.spec.light?15:r.spec.receptacle?(a||20):(v>=240?30:20);
           let c=p.spec.circuits.find(ci=>!ci.dedicated&&ci.voltage===v&&ci.amps===wantBr&&ci.kind===kind&&
             (this._circuitLoad(sc,p,ci.id)+load) <= 0.8*ci.amps);
           if(!c){c={id:"ck"+(++cseq),label:letter(p.spec.circuits.length),amps:wantBr,voltage:v,dedicated:false,kind};
@@ -648,6 +667,10 @@ const Services = {
     const outMap={}; for(const n of nodes.filter(n=>n.kind==="receptacle")){const k=(n.spec.voltage||120)+"|"+(n.spec.amps||20); outMap[k]=(outMap[k]||0)+1;}
     const outlets=Object.entries(outMap).map(([k,count])=>{const p=k.split("|").map(Number); return {voltage:p[0],amps:p[1],count};})
       .sort((a,b)=>a.voltage-b.voltage||a.amps-b.amps);
+    // light fixtures by wattage
+    const ltMap={}; for(const n of nodes.filter(n=>n.kind==="light")){const k=(n.spec.watts||40)+"|"+(n.spec.voltage||120); ltMap[k]=(ltMap[k]||0)+1;}
+    const lights=Object.entries(ltMap).map(([k,count])=>{const p=k.split("|").map(Number); return {watts:p[0],voltage:p[1],count};})
+      .sort((a,b)=>a.watts-b.watts);
     // panel circuit lookup
     const panels=nodes.filter(n=>n.kind==="panel");
     const ckById={}; for(const p of panels) for(const c of (p.spec.circuits||[])) ckById[c.id]=c;
@@ -673,7 +696,7 @@ const Services = {
     // fixed equipment
     const equipment=[["Load center / panel","panel"],["Dust collector","dust_collector"],["Air compressor","compressor"]]
       .map(pair=>({item:pair[0],count:nodes.filter(n=>n.kind===pair[1]).length})).filter(e=>e.count>0);
-    return {outlets,wireByGauge,breakers,duct,airFt,airRuns:airRuns.length,airElbows,equipment};
+    return {outlets,lights,wireByGauge,breakers,duct,airFt,airRuns:airRuns.length,airElbows,equipment};
   },
   compute(doc){
     const sc=this.scenario(doc); const recs=[]; const runs=sc.utilityRuns||[];
@@ -697,6 +720,11 @@ const Services = {
         recs.push({sev:"error",text:`${pl.label||def.name} needs 240V but no panel supplies it`});}
     if(!panels.length && sc.utilityNodes.some(n=>n.kind==="receptacle"))
       recs.push({sev:"error",text:`outlets are placed but no panel supplies them`});
+    if(!panels.length && sc.utilityNodes.some(n=>n.kind==="light"))
+      recs.push({sev:"error",text:`light fixtures are placed but no panel supplies them`});
+    for(const nd of sc.utilityNodes.filter(n=>(n.kind==="dust_collector"||n.kind==="compressor")&&n.spec&&n.spec.amps)){
+      if(!panels.length) recs.push({sev:"error",text:`${nd.label} needs power but no panel supplies it`});
+      else if((nd.spec.voltage||240)>=240 && !panel240) recs.push({sev:"error",text:`${nd.label} needs 240V but no panel supplies it`});}
     // per-circuit: breaker overload and voltage mismatch
     for(const p of panels){
       for(const c of this.circuitReport(doc,p)){
@@ -791,7 +819,7 @@ const Print = {
 
 /* ---- history: snapshot undo/redo ---- */
 const History = {
-  states:[], idx:-1, MAX:80, suspend:false, dragging:false,
+  states:[], idx:-1, MAX:80, suspend:false, dragging:false, onRecord:null,
   snapshot(doc){const c=Object.assign({},doc); delete c.library; return JSON.stringify(c);},
   restore(s){const d=JSON.parse(s); d.library=SEED.library; return d;},
   reset(){this.states=[]; this.idx=-1;},
@@ -802,6 +830,7 @@ const History = {
     this.states=this.states.slice(0,this.idx+1);              // drop any redo tail
     this.states.push(s); this.idx=this.states.length-1;
     if(this.states.length>this.MAX){this.states.shift(); this.idx--;}
+    if(this.onRecord) try{this.onRecord();}catch(_){}
   },
   canUndo(){return this.idx>0;},
   canRedo(){return this.idx<this.states.length-1;},
@@ -969,12 +998,25 @@ const View = {
         g+=`<line x1="${a[0]-2}" y1="${a[1]-2}" x2="${a[0]-2}" y2="${a[1]+1}" stroke="var(--ground)" stroke-width="1.3" style="pointer-events:none"/>`;
         g+=`<line x1="${a[0]+2}" y1="${a[1]-2}" x2="${a[0]+2}" y2="${a[1]+1}" stroke="var(--ground)" stroke-width="1.3" style="pointer-events:none"/>`;
         g+=`<text x="${a[0]}" y="${a[1]+15}" fill="var(--ink-dim)" font-size="7" font-family="var(--font-mono)" text-anchor="middle" style="pointer-events:none">${nd.spec.voltage||120}V ${nd.spec.amps||20}A</text>`;
+      } else if(nd.kind==="light"){
+        g+=`<circle cx="${a[0]}" cy="${a[1]}" r="6.5" fill="var(--soft)" fill-opacity="0.85" stroke="var(--ground)" stroke-width="1.3"/>`;
+        g+=`<line x1="${a[0]-4.5}" y1="${a[1]}" x2="${a[0]+4.5}" y2="${a[1]}" stroke="var(--ground)" stroke-width="1.1" style="pointer-events:none"/>`;
+        g+=`<line x1="${a[0]}" y1="${a[1]-4.5}" x2="${a[0]}" y2="${a[1]+4.5}" stroke="var(--ground)" stroke-width="1.1" style="pointer-events:none"/>`;
+        g+=`<text x="${a[0]}" y="${a[1]+15}" fill="var(--ink-dim)" font-size="7" font-family="var(--font-mono)" text-anchor="middle" style="pointer-events:none">${nd.spec.watts||40}W</text>`;
       }
-      if(nd.kind!=="receptacle") g+=`<text x="${a[0]}" y="${a[1]-11}" fill="var(--ink)" font-size="8" font-family="var(--font-mono)" text-anchor="middle" style="pointer-events:none">${nd.label}</text>`;
+      if(nd.kind!=="receptacle"&&nd.kind!=="light") g+=`<text x="${a[0]}" y="${a[1]-11}" fill="var(--ink)" font-size="8" font-family="var(--font-mono)" text-anchor="middle" style="pointer-events:none">${nd.label}</text>`;
       if(selN) g+=`<circle cx="${a[0]}" cy="${a[1]}" r="11" fill="none" stroke="var(--brass)" stroke-width="1.5" stroke-dasharray="4 3" style="pointer-events:none"/>`;
     }
     // facility features (columns, doors, windows)
     g+=this.featureSVG(doc, p=>this.toScreen(p), {ink:"var(--ink)",dim:"var(--ink-dim)",line:"var(--line)",hard:"var(--hard)"}, UI.selectedFeatureId);
+    // plat notes (annotations): a pin plus multi-line text
+    if(UI.showNotes!==false) for(const an of (sc.annotations||[])){const a=this.toScreen(an.position); const selA=an.id===UI.selectedAnnotationId;
+      const lines=String(an.text||"").split("\n");
+      g+=`<rect x="${a[0]-4}" y="${a[1]-4}" width="8" height="8" rx="1.5" fill="var(--brass)" stroke="var(--ground)" stroke-width="1.2"/>`;
+      const tx=a[0]+8, ty=a[1]-2;
+      const tsp=lines.map((ln,i)=>`<tspan x="${tx}" dy="${i===0?0:11}">${(ln||" ").replace(/&/g,"&amp;").replace(/</g,"&lt;")}</tspan>`).join("");
+      g+=`<text x="${tx}" y="${ty}" fill="var(--ink)" font-size="9" font-family="var(--font-mono)" style="pointer-events:none">${tsp}</text>`;
+      if(selA)g+=`<rect x="${a[0]-7}" y="${a[1]-7}" width="14" height="14" rx="2" fill="none" stroke="var(--brass)" stroke-width="1.5" stroke-dasharray="4 3" style="pointer-events:none"/>`;}
     // sounding mode: boundary vertex handles
     if(UI.mode==="sounding"){
       fac.boundary.vertices.forEach((v,i)=>{const a=this.toScreen(v);
@@ -1071,9 +1113,18 @@ const View = {
       g+=`<text x="${a[0]}" y="${a[1]-7}" fill="${pal.ink}" font-size="8.5" font-family="var(--font-mono)" text-anchor="middle">${pl.label||def.name}</text>`;}
     for(const nd of (sc.utilityNodes||[])){const a=S(nd.position);
       if(nd.kind==="dust_collector") g+=`<circle cx="${a[0]}" cy="${a[1]}" r="7" fill="${pal.dust}" stroke="${pal.panel}" stroke-width="1.5"/>`;
+      else if(nd.kind==="receptacle"){g+=`<circle cx="${a[0]}" cy="${a[1]}" r="5.5" fill="${pal.power}" stroke="${pal.panel}" stroke-width="1.3"/>`;
+        g+=`<text x="${a[0]}" y="${a[1]+13}" fill="${pal.dim}" font-size="7" font-family="var(--font-mono)" text-anchor="middle">${nd.spec.voltage||120}V ${nd.spec.amps||20}A</text>`;}
+      else if(nd.kind==="light"){g+=`<circle cx="${a[0]}" cy="${a[1]}" r="6" fill="${pal.soft}" fill-opacity="0.85" stroke="${pal.panel}" stroke-width="1.2"/>`;
+        g+=`<line x1="${a[0]-4}" y1="${a[1]}" x2="${a[0]+4}" y2="${a[1]}" stroke="${pal.panel}" stroke-width="1"/><line x1="${a[0]}" y1="${a[1]-4}" x2="${a[0]}" y2="${a[1]+4}" stroke="${pal.panel}" stroke-width="1"/>`;
+        g+=`<text x="${a[0]}" y="${a[1]+13}" fill="${pal.dim}" font-size="7" font-family="var(--font-mono)" text-anchor="middle">${nd.spec.watts||40}W</text>`;}
       else if(nd.kind==="panel") g+=`<rect x="${a[0]-6}" y="${a[1]-8}" width="12" height="16" fill="${pal.power}" stroke="${pal.panel}" stroke-width="1.5"/>`;
-      g+=`<text x="${a[0]}" y="${a[1]-11}" fill="${pal.ink}" font-size="8" font-family="var(--font-mono)" text-anchor="middle">${nd.label}</text>`;}
+      if(nd.kind!=="receptacle"&&nd.kind!=="light") g+=`<text x="${a[0]}" y="${a[1]-11}" fill="${pal.ink}" font-size="8" font-family="var(--font-mono)" text-anchor="middle">${nd.label}</text>`;}
     g+=this.featureSVG(doc, S, {ink:pal.ink,dim:pal.dim,line:pal.line,hard:pal.hard}, null);
+    if(opt.notes!==false) for(const an of (sc.annotations||[])){const a=S(an.position); const lines=String(an.text||"").split("\n");
+      g+=`<rect x="${a[0]-4}" y="${a[1]-4}" width="8" height="8" rx="1.5" fill="${pal.brass}" stroke="${pal.panel}" stroke-width="1.2"/>`;
+      const tx=a[0]+8; const tsp=lines.map((ln,i)=>`<tspan x="${tx}" dy="${i===0?0:11}">${(ln||" ").replace(/&/g,"&amp;").replace(/</g,"&lt;")}</tspan>`).join("");
+      g+=`<text x="${tx}" y="${a[1]-2}" fill="${pal.ink}" font-size="9" font-family="var(--font-mono)">${tsp}</text>`;}
     // title block, scale bar, north arrow, legend (issued plat)
     if(opt.titleBlock){
       const d=doc.meta; const date=d.date||new Date().toISOString().slice(0,10);
@@ -1186,6 +1237,12 @@ const View = {
             drag={bendFlow:UI.selectedFlowId,bendIdx:k,offX:w[0]-wp.bend[0],offY:w[1]-wp.bend[1]};
             History.dragging=true; host.setPointerCapture(e.pointerId); return;}}}
       }
+      // select mode: annotation pins sit on top and are grabbable
+      if(UI.showNotes!==false){const anns=sc.annotations||[]; for(let i=anns.length-1;i>=0;i--){const an=anns[i];
+        if(Math.hypot(an.position[0]-w[0],an.position[1]-w[1])<12){
+          UI.selectAnnotation(an.id);
+          drag={annotation:an.id,offX:w[0]-an.position[0],offY:w[1]-an.position[1]};
+          History.dragging=true; host.setPointerCapture(e.pointerId); return;}}}
       if(hit){ UI.select(hit.id);
         if(!hit.locked){ drag={id:hit.id,offX:w[0]-hit.position[0],offY:w[1]-hit.position[1]};
           History.dragging=true; host.setPointerCapture(e.pointerId); }
@@ -1201,6 +1258,10 @@ const View = {
       if(drag.bendFlow){let nx=w[0]-drag.offX, ny=w[1]-drag.offY;
         if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
         UI.moveBend(drag.bendFlow,drag.bendIdx,[nx,ny]); return;}
+      if(drag.annotation){const an=(sc.annotations||[]).find(a=>a.id===drag.annotation); if(!an)return;
+        let nx=w[0]-drag.offX, ny=w[1]-drag.offY;
+        if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
+        an.position=[nx,ny]; this.refresh(); return;}
       if(drag.node){const nd=sc.utilityNodes.find(n=>n.id===drag.node); if(!nd)return;
         let nx=w[0]-drag.offX, ny=w[1]-drag.offY;
         if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
@@ -1235,10 +1296,16 @@ const View = {
 /* ---- ui ---- */
 const UI = {
   doc:null, selectedId:null, mode:"select", activeFlowId:null, selectedFlowId:null, selectedNodeId:null,
-  selectedVertex:null, selectedFeatureId:null, draftWalls:null, selectedRunId:null, compareA:null, compareB:null, measurePts:null,
-  vis:{dust:true, electrical:true, air:true},
+  selectedVertex:null, selectedFeatureId:null, draftWalls:null, selectedRunId:null, selectedAnnotationId:null, compareA:null, compareB:null, measurePts:null,
+  vis:{dust:true, electrical:true, air:true}, showNotes:true,
   boot(){ if(location.hash==="#test"){Tests.run();return;}
-    History.reset(); this.doc=Model.demo(); this.render();},
+    History.reset();
+    History.onRecord=()=>this.scheduleAutosave();
+    const restored=this.autosaveLoad();
+    this.doc=restored||Model.demo();
+    this.render();
+    const ok=this.storeAvailable()&&this.autosaveSave();
+    this.setSaveState(ok?"saved":"off");},
   undo(){const d=History.undo(); if(!d)return; History.suspend=true; this.doc=d;
     this.selectedId=this.selectedNodeId=this.selectedFeatureId=null; this.selectedVertex=null; this.selectedFlowId=null;
     this.render(); History.suspend=false;},
@@ -1300,11 +1367,37 @@ const UI = {
   setVisAll(on){this.vis={dust:on,electrical:on,air:on}; if(!on)this.selectedRunId=null; View.draw(); this.syncPanels();},
   units(){return (this.doc&&this.doc.meta&&this.doc.meta.units)||"imperial";},
   setUnits(u){if(!this.doc.meta)this.doc.meta={}; this.doc.meta.units=u; this.render();},
+  STORE_KEY:"bayplan-autosave-v1",
+  storeAvailable(){ if(this._storeOK!=null)return this._storeOK;
+    try{const k="__bp_test__"; localStorage.setItem(k,"1"); localStorage.removeItem(k); this._storeOK=true;}
+    catch(_){this._storeOK=false;} return this._storeOK;},
+  autosaveSave(){ if(!this.storeAvailable())return false;
+    try{localStorage.setItem(this.STORE_KEY, History.snapshot(this.doc)); return true;}
+    catch(_){this._storeOK=false; return false;}},
+  autosaveLoad(){ if(!this.storeAvailable())return null;
+    try{const s=localStorage.getItem(this.STORE_KEY); return s?History.restore(s):null;}
+    catch(_){return null;}},
+  autosaveClear(){ try{localStorage.removeItem(this.STORE_KEY);}catch(_){}},
+  scheduleAutosave(){ if(!this.storeAvailable()){this.setSaveState("off"); return;}
+    this.setSaveState("dirty");
+    clearTimeout(this._saveTimer);
+    this._saveTimer=setTimeout(()=>{const ok=this.autosaveSave(); this.setSaveState(ok?"saved":"off");}, 1200);},
+  setSaveState(state){ this._saveState=state; const el=document.getElementById("saveState"); if(!el)return;
+    if(state==="saved"){const t=new Date(); const hh=String(t.getHours()).padStart(2,"0"), mm=String(t.getMinutes()).padStart(2,"0");
+      el.textContent="Saved "+hh+":"+mm; el.style.color="var(--shared)"; el.title="Autosaved to this browser";}
+    else if(state==="dirty"){el.textContent="Saving\u2026"; el.style.color="var(--soft)"; el.title="Unsaved changes";}
+    else {el.textContent="Autosave off"; el.style.color="var(--ink-dim)"; el.title="Storage unavailable here; use Export to keep your work";}},
   setOutlet(patch){const sc=Services.scenario(this.doc); const nd=(sc.utilityNodes||[]).find(n=>n.id===this.selectedNodeId);
     if(!nd||nd.kind!=="receptacle")return;
     if(patch.voltage!=null){nd.spec.voltage=patch.voltage;
       const ok=patch.voltage>=240?[20,30,50]:[15,20]; if(!ok.includes(nd.spec.amps))nd.spec.amps=patch.voltage>=240?30:20;}
     if(patch.amps!=null)nd.spec.amps=patch.amps;
+    View.refresh();},
+  setNodePower(patch){const sc=Services.scenario(this.doc); const nd=(sc.utilityNodes||[]).find(n=>n.id===this.selectedNodeId);
+    if(!nd||(nd.kind!=="dust_collector"&&nd.kind!=="compressor"&&nd.kind!=="light"))return;
+    if(patch.voltage!=null)nd.spec.voltage=patch.voltage;
+    if(patch.amps!=null)nd.spec.amps=patch.amps;
+    if(patch.watts!=null)nd.spec.watts=patch.watts;
     View.refresh();},
   newCircuitFor(runId){const sc=Services.scenario(this.doc); const run=(sc.utilityRuns||[]).find(r=>r.id===runId); if(!run)return;
     const panel=sc.utilityNodes.find(n=>n.id===run.fromNode); if(!panel)return; if(!panel.spec.circuits)panel.spec.circuits=[];
@@ -1341,10 +1434,25 @@ const UI = {
       b.setAttribute("aria-pressed",String(b.dataset.themeBtn===t));},
   selected(){const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
     return sc.placements.find(p=>p.id===this.selectedId)||null;},
-  select(id){this.selectedId=id; View.draw(); this.syncPanels();},
+  select(id){this.selectedId=id; this.selectedAnnotationId=null; View.draw(); this.syncPanels();},
   rotate(delta){const pl=this.selected(); if(!pl||pl.locked)return;
     pl.rotation=(((pl.rotation||0)+delta)%360+360)%360; View.refresh();},
   mirror(){const pl=this.selected(); if(!pl||pl.locked)return; pl.mirrored=!pl.mirrored; View.refresh();},
+  setLabel(text){const pl=this.selected(); if(!pl)return; const t=(text||"").trim(); pl.label=t||undefined; View.refresh();},
+  addAnnotation(){const sc=Services.scenario(this.doc); if(!sc.annotations)sc.annotations=[];
+    const fb=G.bounds(this.doc.facility.boundary);
+    const off=sc.annotations.length*8;
+    const a={id:"an"+Date.now().toString(36)+Math.floor(Math.random()*1e3).toString(36),
+      position:[Math.round((fb.minX+fb.maxX)/2+off),Math.round((fb.minY+fb.maxY)/2+off)],text:"Note"};
+    sc.annotations.push(a); this.selectAnnotation(a.id);},
+  selectAnnotation(id){this.selectedId=null; this.selectedNodeId=null; this.selectedRunId=null; this.selectedFeatureId=null;
+    this.selectedAnnotationId=id; View.refresh();
+    const ta=document.querySelector('[data-an="text"]'); if(ta){ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length);}},
+  setAnnotationText(id,text){const sc=Services.scenario(this.doc); const a=(sc.annotations||[]).find(x=>x.id===id);
+    if(!a)return; a.text=text; View.draw(); this.scheduleAutosave();},
+  removeAnnotation(id){const sc=Services.scenario(this.doc); sc.annotations=(sc.annotations||[]).filter(a=>a.id!==id);
+    if(this.selectedAnnotationId===id)this.selectedAnnotationId=null; View.refresh();},
+  toggleNotes(){this.showNotes=this.showNotes===false; if(!this.showNotes)this.selectedAnnotationId=null; this.render();},
   setSize(w,h){const pl=this.selected(); if(!pl||pl.locked)return; pl.size=[Math.max(1,w),Math.max(1,h)]; View.refresh();},
   resetSize(){const pl=this.selected(); if(!pl||pl.locked)return; delete pl.size; View.refresh();},
   toggleLock(){const pl=this.selected(); if(!pl)return; pl.locked=!pl.locked; View.refresh();},
@@ -1411,6 +1519,7 @@ const UI = {
     const lines=[]; const title=(this.doc.meta.title||"Untitled").toUpperCase();
     lines.push("MATERIALS TAKEOFF \u2014 "+title); lines.push("BAYPLAN FI-075 \u00b7 "+(this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId)||{}).name); lines.push("");
     if(t.outlets.length){lines.push("OUTLETS"); for(const o of t.outlets) lines.push(`  ${o.voltage}V ${o.amps}A x ${o.count}`); lines.push("");}
+    if(t.lights&&t.lights.length){lines.push("LIGHTING"); for(const l of t.lights) lines.push(`  ${l.watts}W ${l.voltage}V fixture x ${l.count}`); lines.push("");}
     if(t.breakers.length){lines.push("BREAKERS"); for(const b of t.breakers) lines.push(`  ${b.amps}A ${b.pole}-pole x ${b.count}`); lines.push("");}
     if(t.wireByGauge.length){lines.push("COPPER CABLE (branch runs, +15% slack)"); for(const w of t.wireByGauge) lines.push(`  ${w.gauge} AWG \u2014 ${L(w.ft)} run, buy ${L(w.buyFt)}`); lines.push("");}
     if(t.duct.length){lines.push("DUST DUCT"); for(const d of t.duct) lines.push(`  ${d.diameter}in \u2014 ${L(d.ft)}, ${d.elbows} elbow(s), ${d.gates} blast gate(s)`); lines.push("");}
@@ -1423,9 +1532,10 @@ const UI = {
     const L=ft=> metric? (ft*0.3048).toFixed(1)+" m" : Math.ceil(ft)+" ft";
     const sec=(title,rows)=> rows.length?`<div style="margin-top:14px"><h3 style="margin:0 0 4px">${title}</h3>
       <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:12.5px">${rows.map(r=>`<tr><td style="padding:2px 0">${r[0]}</td><td style="text-align:right;color:var(--ink-dim)">${r[1]}</td></tr>`).join("")}</table></div>`:"";
-    const anything=t.outlets.length||t.wireByGauge.length||t.breakers.length||t.duct.length||t.airRuns||t.equipment.length;
+    const anything=t.outlets.length||t.lights.length||t.wireByGauge.length||t.breakers.length||t.duct.length||t.airRuns||t.equipment.length;
     const body = anything? [
       sec("Outlets", t.outlets.map(o=>[`${o.voltage}V ${o.amps}A`, `\u00d7 ${o.count}`])),
+      sec("Lighting", t.lights.map(l=>[`${l.watts}W ${l.voltage}V fixture`, `\u00d7 ${l.count}`])),
       sec("Breakers", t.breakers.map(b=>[`${b.amps}A ${b.pole}-pole`, `\u00d7 ${b.count}`])),
       sec("Copper cable (branch runs, +15% slack)", t.wireByGauge.map(w=>[`${w.gauge} AWG`, `${L(w.ft)} run \u00b7 buy ${L(w.buyFt)}`])),
       sec("Dust duct", t.duct.map(d=>[`${d.diameter}in duct`, `${L(d.ft)} \u00b7 ${d.elbows} elbow${d.elbows!==1?'s':''} \u00b7 ${d.gates} gate${d.gates!==1?'s':''}`])),
@@ -1437,7 +1547,7 @@ const UI = {
       <h1>Materials takeoff</h1>
       <p style="color:var(--ink-dim); font-size:12.5px; margin:0">Quantities from the active scenario's utilities. Lengths follow your unit setting; cable includes a fifteen percent slack allowance for terminations.</p>
       ${body}
-      ${anything?`<div style="margin-top:16px"><button id="toCopy">Copy list</button> <span id="toCopyMsg" style="color:var(--ink-dim); font-size:11.5px; margin-left:8px"></span></div>
+      ${anything?`<div style="margin-top:16px"><button id="toPrint">Print / PDF</button> <button id="toCopy">Copy list</button> <span id="toCopyMsg" style="color:var(--ink-dim); font-size:11.5px; margin-left:8px"></span></div>
       <textarea id="toText" readonly style="width:100%; height:150px; margin-top:8px; font-family:var(--font-mono); font-size:11.5px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:8px">${text.replace(/</g,"&lt;")}</textarea>`:``}
       <p style="margin-top:16px"><a href="#" onclick="UI.render();return false">\u2190 back to plat</a></p>
     </div>`;
@@ -1446,6 +1556,53 @@ const UI = {
       const done=()=>{if(msg)msg.textContent="copied";};
       try{navigator.clipboard.writeText(text).then(done,()=>{ta.focus();ta.select();done();});}
       catch(_){ta.focus();ta.select(); try{document.execCommand("copy");}catch(e){} done();}};
+    const pb=document.getElementById("toPrint"); if(pb)pb.onclick=()=>this.printTakeoff();
+  },
+  printTakeoff(){
+    const t=Services.takeoff(this.doc); const metric=this.units()==="metric";
+    const L=ft=> metric? (ft*0.3048).toFixed(1)+" m" : Math.ceil(ft)+" ft";
+    const d=this.doc.meta; if(!d.date)d.date=new Date().toISOString().slice(0,10);
+    const scn=(this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId)||{}).name||"";
+    const plat=View.platSVG(this.doc,this.doc.activeScenarioId,{palette:"print",titleBlock:false,legend:true,notes:this.showNotes!==false});
+    const styleEl=document.getElementById("printPageStyle")||(()=>{const s=document.createElement("style");s.id="printPageStyle";document.head.appendChild(s);return s;})();
+    styleEl.textContent=`@media print{@page{size:8.5in 11in; margin:0.6in;}
+      #printSheet .tk{color:#141414; font-family:"Iowan Old Style",Palatino,Georgia,serif;}
+      #printSheet .tk-top{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #141414; padding-bottom:6px;}
+      #printSheet .tk-title{font-size:20px; letter-spacing:1px; margin:0;}
+      #printSheet .tk-sub{font-size:10px; color:#555; letter-spacing:2px; text-transform:uppercase; margin:2px 0 0;}
+      #printSheet .tk-meta{font-family:ui-monospace,Menlo,monospace; font-size:9.5px; color:#444; text-align:right; line-height:1.5;}
+      #printSheet .tk-plat{border:1px solid #333; padding:6px; margin:12px 0; text-align:center; break-inside:avoid;}
+      #printSheet .tk-plat svg{max-height:3.5in; width:auto; max-width:100%; display:inline-block;}
+      #printSheet .tk-plat-cap{font-family:ui-monospace,Menlo,monospace; font-size:8px; color:#777; letter-spacing:1px; margin-top:4px;}
+      #printSheet .tk-sec{break-inside:avoid; margin-top:12px;}
+      #printSheet .tk-sec h3{font-size:11px; letter-spacing:2px; text-transform:uppercase; color:#141414; border-bottom:1px solid #bbb; padding-bottom:3px; margin:0 0 4px;}
+      #printSheet table.tk-t{width:100%; border-collapse:collapse; font-family:ui-monospace,Menlo,monospace; font-size:11px;}
+      #printSheet table.tk-t td{padding:3px 4px; border-bottom:1px solid #eee; vertical-align:top;}
+      #printSheet table.tk-t td.box{width:16px; color:#141414; font-size:13px;}
+      #printSheet table.tk-t td.qty{text-align:right; color:#333; white-space:nowrap;}
+      #printSheet .tk-foot{margin-top:18px; border-top:1px solid #bbb; padding-top:5px; font-family:ui-monospace,Menlo,monospace; font-size:8.5px; color:#888; letter-spacing:1px; display:flex; justify-content:space-between;}
+      #printSheet svg{width:auto;} }`;
+    const sec=(title,rows)=> rows.length?`<div class="tk-sec"><h3>${title}</h3><table class="tk-t"><tbody>${rows.map(r=>`<tr><td class="box">\u2610</td><td>${r[0]}</td><td class="qty">${r[1]}</td></tr>`).join("")}</tbody></table></div>`:"";
+    const body=[
+      sec("Outlets", t.outlets.map(o=>[`${o.voltage}V ${o.amps}A receptacle`, `\u00d7 ${o.count}`])),
+      sec("Lighting", t.lights.map(l=>[`${l.watts}W ${l.voltage}V light fixture`, `\u00d7 ${l.count}`])),
+      sec("Breakers", t.breakers.map(b=>[`${b.amps}A ${b.pole}-pole breaker`, `\u00d7 ${b.count}`])),
+      sec("Copper cable (branch runs, +15% slack)", t.wireByGauge.map(w=>[`${w.gauge} AWG cable`, `buy ${L(w.buyFt)} <span style="color:#999">(${L(w.ft)} run)</span>`])),
+      sec("Dust duct", t.duct.map(dd=>[`${dd.diameter}in duct \u00b7 ${dd.elbows} elbow${dd.elbows!==1?'s':''} \u00b7 ${dd.gates} blast gate${dd.gates!==1?'s':''}`, L(dd.ft)])),
+      sec("Compressed air", t.airRuns?[[`air line \u00b7 ${t.airElbows} elbow${t.airElbows!==1?'s':''}`, L(t.airFt)]]:[]),
+      sec("Equipment", t.equipment.map(e=>[e.item, `\u00d7 ${e.count}`])),
+    ].join("");
+    const anything=body.replace(/\s/g,"").length>0;
+    document.getElementById("printSheet").innerHTML=`<div class="tk">
+      <div class="tk-top">
+        <div><h1 class="tk-title">${(d.title||'Untitled').toUpperCase()}</h1><p class="tk-sub">Materials Takeoff</p></div>
+        <div class="tk-meta">${scn?scn.toUpperCase()+'<br>':''}${d.date}<br>REV ${d.revision||'A'}${d.author?'<br>'+d.author.toUpperCase():''}</div>
+      </div>
+      <div class="tk-plat">${plat.svg}<div class="tk-plat-cap">${(this.doc.facility.name||'FLOOR PLAN').toUpperCase()} \u00b7 ${metric?'METRIC':'IMPERIAL'}</div></div>
+      ${anything?body:`<p style="font-family:ui-monospace,monospace;font-size:11px;color:#777;margin-top:14px">Nothing wired yet. Place the panel, outlets, collector, and compressor, then Wire all.</p>`}
+      <div class="tk-foot"><span>BAYPLAN FI-075 \u00b7 GREEN SHOE GARAGE</span><span>quantities off the drawing; couplings, boxes, and fasteners not included</span></div>
+    </div>`;
+    window.print();
   },
   printSetup(){
     if(!this.printOpts) this.printOpts={paper:"letter",orient:"auto",scale:"fit"};
@@ -1488,10 +1645,10 @@ const UI = {
     if(o.scale==="fit"){
       const orient=o.orient==="auto"?"landscape":o.orient; const pr=Print.printable(o.paper,orient);
       styleEl.textContent=`@media print{@page{size:${pr[2]}in ${pr[3]}in; margin:${Print.MARGIN}in;} #printSheet .pg{width:${pr[0]}in;height:${pr[1]}in;overflow:hidden;} #printSheet .pg svg{width:100%;height:100%;}}`;
-      const full=View.platSVG(this.doc,this.doc.activeScenarioId,{palette:"print",titleBlock:true,legend:true});
+      const full=View.platSVG(this.doc,this.doc.activeScenarioId,{palette:"print",titleBlock:true,legend:true,notes:this.showNotes!==false});
       sheetHost.innerHTML=`<div class="pg">${full.svg}</div>`;
     } else {
-      const base=View.platSVG(this.doc,this.doc.activeScenarioId,{palette:"print",titleBlock:false,legend:false});
+      const base=View.platSVG(this.doc,this.doc.activeScenarioId,{palette:"print",titleBlock:false,legend:false,notes:this.showNotes!==false});
       const orient=Print.resolveOrient(o.paper,o.orient,o.scale,base.vbW,base.vbH);
       const pr=Print.printable(o.paper,orient); const s=Print.SCALES[o.scale];
       const plan=Print.plan(base.vbW,base.vbH,pr[0],pr[1],s);
@@ -1522,6 +1679,8 @@ const UI = {
           <button id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo" ${History.canUndo()?'':'disabled'}>Undo</button>
           <button id="redoBtn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" ${History.canRedo()?'':'disabled'}>Redo</button>
           <button id="roomBtn">Room</button>
+          <button id="noteBtn" title="Add a note to the plat">+ Note</button>
+          <button id="notesVisBtn" title="Show or hide notes" aria-pressed="${this.showNotes!==false}">${this.showNotes!==false?"\u25c9":"\u25ef"} Notes</button>
           <button id="measureBtn">Measure</button>
           <span class="seg" role="group" aria-label="Units">
             <button data-units-btn="imperial" aria-pressed="${this.units()!=='metric'}">in</button>
@@ -1533,6 +1692,7 @@ const UI = {
           <button id="newBtn">New</button>
           <button id="importBtn">Import</button>
           <button id="exportBtn">Export</button>
+          <span id="saveState" title="Autosave" style="font-family:var(--font-mono); font-size:11px; color:var(--ink-dim); align-self:center; padding:0 4px"></span>
           <span class="seg" role="group" aria-label="Theme">
             <button data-theme-btn="night" aria-pressed="true">Night</button>
             <button data-theme-btn="day" aria-pressed="false">Day</button>
@@ -1576,6 +1736,8 @@ const UI = {
     document.getElementById("undoBtn").onclick=()=>this.undo();
     document.getElementById("redoBtn").onclick=()=>this.redo();
     document.getElementById("roomBtn").onclick=()=>this.enterSounding();
+    document.getElementById("noteBtn").onclick=()=>{this.mode="select"; this.showNotes=true; this.addAnnotation();};
+    document.getElementById("notesVisBtn").onclick=()=>this.toggleNotes();
     document.getElementById("measureBtn").onclick=()=>this.enterMeasure();
     document.getElementById("compareBtn").onclick=()=>this.showCompare();
     document.getElementById("printBtn").onclick=()=>this.printSetup();
@@ -1587,12 +1749,13 @@ const UI = {
       inp.click();};
     for(const b of document.querySelectorAll("[data-theme-btn]")) b.onclick=()=>this.setTheme(b.dataset.themeBtn);
     for(const b of document.querySelectorAll("[data-units-btn]")) b.onclick=()=>this.setUnits(b.dataset.unitsBtn);
+    this.setSaveState(this._saveState || (this.storeAvailable()?"saved":"off"));
     for(const b of document.querySelectorAll("[data-add]")) b.onclick=()=>this.addMachine(b.dataset.add);
     this.bindKeys();
   },
   bindKeys(){
     document.onkeydown=e=>{
-      if(e.target.tagName==="INPUT")return;
+      if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
       if((e.ctrlKey||e.metaKey)&&(e.key==="z"||e.key==="Z")){
         if(e.shiftKey)this.redo(); else this.undo(); e.preventDefault(); return;}
       if((e.ctrlKey||e.metaKey)&&(e.key==="y"||e.key==="Y")){this.redo(); e.preventDefault(); return;}
@@ -1627,7 +1790,10 @@ const UI = {
       }
       if(this.mode==="route"){ if(e.key==="Escape")this.doneRouting();
         else if(e.key==="Backspace"){this.undoWaypoint();e.preventDefault();} return; }
-      if(e.key==="Escape"){this.select(null);return;}
+      if(e.key==="Escape"){this.select(null); if(this.selectedAnnotationId){this.selectedAnnotationId=null; View.refresh();} return;}
+      if(this.selectedAnnotationId){
+        if(e.key==="Delete"||e.key==="Backspace"){this.removeAnnotation(this.selectedAnnotationId);e.preventDefault();}
+        return; }
       const pl=this.selected(); if(!pl)return;
       if(e.key==="r"||e.key==="R"){this.rotate(e.shiftKey?-90:90);e.preventDefault();}
       else if(e.key==="m"||e.key==="M"){this.mirror();e.preventDefault();}
@@ -1643,13 +1809,27 @@ const UI = {
   syncPanels(){
     const sw=document.getElementById("selWrap"); if(!sw)return;
     const pl=this.selected();
-    if(pl){const def=Model.def(pl.defId);
+    const ann=this.selectedAnnotationId ? ((Services.scenario(this.doc).annotations||[]).find(a=>a.id===this.selectedAnnotationId)) : null;
+    if(ann){
+      sw.innerHTML=`<h2>Note</h2>
+        <div class="selpanel">
+          <textarea data-an="text" placeholder="Type a note\u2026" style="width:100%; height:76px; box-sizing:border-box; font-family:var(--font-mono); font-size:12px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:6px; resize:vertical">${(ann.text||"").replace(/</g,"&lt;")}</textarea>
+          <div class="row" style="margin-top:6px"><button data-an="del" class="danger" style="width:100%">Remove note</button></div>
+          <div style="margin-top:6px; font-family:var(--font-mono); font-size:10px; color:var(--ink-dim)">x ${Math.round(ann.position[0])} \u00b7 y ${Math.round(ann.position[1])} \u00b7 drag the pin to move</div>
+        </div>`;
+      const ta=sw.querySelector('[data-an="text"]'); ta.oninput=()=>this.setAnnotationText(ann.id,ta.value);
+      ta.onchange=()=>View.refresh();
+      sw.querySelector('[data-an="del"]').onclick=()=>this.removeAnnotation(ann.id);
+    } else if(pl){const def=Model.def(pl.defId);
       const ds=G.defSize(def); const sz=pl.size||ds;
       const wv=View.uSize(sz[0]), dv=View.uSize(sz[1]);
       sw.innerHTML=`<h2>Selection</h2>
         <div class="selpanel">
           <div class="name">${pl.label||def.name}</div>
-          <div class="row">
+          <div style="margin-top:6px; font-family:var(--font-mono); font-size:11px">
+            <label>Tag <input data-act="label" type="text" value="${(pl.label||'').replace(/"/g,'&quot;')}" placeholder="${def.name.replace(/"/g,'&quot;')}" style="width:158px"></label>
+          </div>
+          <div class="row" style="margin-top:6px">
             <button data-act="rotL">\u21b6 90</button>
             <button data-act="rotR">90 \u21b7</button>
             <button data-act="mir">Mirror</button>
@@ -1668,6 +1848,7 @@ const UI = {
             x ${Math.round(pl.position[0])} \u00b7 y ${Math.round(pl.position[1])} \u00b7 rot ${pl.rotation||0}\u00b0${pl.mirrored?" \u00b7 mirrored":""}${pl.size?" \u00b7 resized":""}
           </div>
         </div>`;
+      const labIn=sw.querySelector('[data-act="label"]'); if(labIn)labIn.onchange=()=>this.setLabel(labIn.value);
       sw.querySelector('[data-act="rotL"]').onclick=()=>this.rotate(-90);
       sw.querySelector('[data-act="rotR"]').onclick=()=>this.rotate(90);
       sw.querySelector('[data-act="mir"]').onclick=()=>this.mirror();
@@ -1765,7 +1946,7 @@ const UI = {
             const panel=nodes.find(n=>n.id===selRun.fromNode); const cks=(panel&&panel.spec.circuits)||[];
             const cur=cks.find(c=>c.id===selRun.circuitId); const v=selRun.spec.voltage||120;
             const compat=cks.filter(c=>c.voltage===v); const bends=(selRun.waypoints||[]).length;
-            const ep=selRun.toNodeId?"outlet":mn;
+            const ep=selRun.toNodeId?((nodes.find(n=>n.id===selRun.toNodeId)||{}).label||"node"):mn;
             runDetail=`<div class="selpanel" style="margin-top:8px">
               <div class="name">${ep} \u00b7 ${v}V ${selRun.spec.amps||0}A</div>
               <div style="font-family:var(--font-mono);font-size:10.5px;color:var(--ink-dim);margin-top:4px">on circuit ${cur?cur.label+" ("+cur.amps+"A)":'\u2014'} \u00b7 ${bends} bend${bends!==1?'s':''}</div>
@@ -1797,6 +1978,28 @@ const UI = {
             <div class="row" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px">
               ${ampOpts.map(A=>`<button data-ra="${A}" ${A===amps?'aria-pressed="true"':''}>${A}A</button>`).join("")}
             </div></div>`;}
+        else if(selN&&(selN.kind==="dust_collector"||selN.kind==="compressor")){const v=selN.spec.voltage||240; const amps=selN.spec.amps||15;
+          nodeEditor=`<div class="selpanel" style="margin-top:8px">
+            <div class="name">${selN.label} power</div>
+            <div class="row" style="display:flex;gap:4px;margin-top:6px">
+              <button data-pv="120" ${v<240?'aria-pressed="true"':''} style="flex:1">120V</button>
+              <button data-pv="240" ${v>=240?'aria-pressed="true"':''} style="flex:1">240V</button>
+            </div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:6px;font-family:var(--font-mono);font-size:11px">
+              <label>A <input data-pa type="number" min="1" step="1" value="${amps}" style="width:56px"></label>
+              <span style="color:var(--ink-dim)">dedicated circuit</span>
+            </div></div>`;}
+        else if(selN&&selN.kind==="light"){const v=selN.spec.voltage||120; const watts=selN.spec.watts||40;
+          nodeEditor=`<div class="selpanel" style="margin-top:8px">
+            <div class="name">Light fixture</div>
+            <div style="display:flex;gap:6px;align-items:center;margin-top:6px;font-family:var(--font-mono);font-size:11px">
+              <label>W <input data-lw type="number" min="1" step="1" value="${watts}" style="width:60px"></label>
+              <span style="color:var(--ink-dim)">watts</span>
+            </div>
+            <div class="row" style="display:flex;gap:4px;margin-top:6px">
+              <button data-pv="120" ${v<240?'aria-pressed="true"':''} style="flex:1">120V</button>
+              <button data-pv="240" ${v>=240?'aria-pressed="true"':''} style="flex:1">240V</button>
+            </div></div>`;}
         const hasRuns=(sc.utilityRuns||[]).length>0;
         const legend=hasRuns?`<div style="margin-top:8px;font-family:var(--font-mono);font-size:9.5px;color:var(--ink-dim);line-height:1.6">
             <span style="color:var(--power)">\u2501</span> 120V \u00b7 <span style="color:var(--power240)">\u2501</span> 240V \u00b7 dashes: 15/20/30/50A \u00b7 label = circuit</div>`:"";
@@ -1814,6 +2017,7 @@ const UI = {
             <button data-sv="panel" style="flex:1;min-width:88px">+ Panel</button>
             <button data-sv="compressor" style="flex:1;min-width:88px">+ Compressor</button>
             <button data-sv="receptacle" style="flex:1;min-width:88px">+ Outlet</button>
+            <button data-sv="light" style="flex:1;min-width:88px">+ Light</button>
           </div>
           <div class="row" style="display:flex; gap:6px; margin-top:6px">
             <button data-sv="wire" style="flex:1" ${(collectors||panels||compressors)?'':'disabled'}>Wire all</button>
@@ -1836,6 +2040,7 @@ const UI = {
         vw.querySelector('[data-sv="panel"]').onclick=()=>this.addNode("panel");
         vw.querySelector('[data-sv="compressor"]').onclick=()=>this.addNode("compressor");
         vw.querySelector('[data-sv="receptacle"]').onclick=()=>this.addNode("receptacle");
+        vw.querySelector('[data-sv="light"]').onclick=()=>this.addNode("light");
         vw.querySelector('[data-sv="wire"]').onclick=()=>this.wireAll();
         vw.querySelector('[data-sv="clear"]').onclick=()=>this.clearRuns();
         vw.querySelector('[data-sv="exit"]').onclick=()=>this.exitServices();
@@ -1843,6 +2048,9 @@ const UI = {
           if(k==="_all_on")this.setVisAll(true); else if(k==="_all_off")this.setVisAll(false); else this.toggleVis(k);};
         for(const b of vw.querySelectorAll("[data-rv]")) b.onclick=()=>this.setOutlet({voltage:parseInt(b.dataset.rv,10)});
         for(const b of vw.querySelectorAll("[data-ra]")) b.onclick=()=>this.setOutlet({amps:parseInt(b.dataset.ra,10)});
+        for(const b of vw.querySelectorAll("[data-pv]")) b.onclick=()=>this.setNodePower({voltage:parseInt(b.dataset.pv,10)});
+        const paIn=vw.querySelector("[data-pa]"); if(paIn)paIn.onchange=()=>this.setNodePower({amps:Math.max(1,parseInt(paIn.value,10)||1)});
+        const lwIn=vw.querySelector("[data-lw]"); if(lwIn)lwIn.onchange=()=>this.setNodePower({watts:Math.max(1,parseInt(lwIn.value,10)||1)});
         const st=vw.querySelector('[data-sv="straighten"]'); if(st)st.onclick=()=>this.straightenRun(this.selectedRunId);
         for(const b of vw.querySelectorAll("[data-ckassign]")) b.onclick=()=>{const cid=b.dataset.ckassign;
           if(cid==="new")this.newCircuitFor(this.selectedRunId); else this.reassignCircuit(this.selectedRunId,cid);};
@@ -2236,6 +2444,54 @@ const Tests = {
       this.ok("TAKEOFF: copper cable grouped by gauge with slack",t.wireByGauge.length>0&&t.wireByGauge.every(w=>w.buyFt>=w.ft));
       this.ok("TAKEOFF: duct tallied with blast gates",t.duct.length>0&&t.duct.every(x=>x.gates>=1));
       this.ok("TAKEOFF: equipment counted",t.equipment.find(e=>/compressor/i.test(e.item)).count===1);})();
+    // v0.0.20: collector + compressor draw power
+    (()=>{const d=Model.demo();
+      Model.addNode(d,"panel"); Model.addNode(d,"dust_collector"); Model.addNode(d,"compressor");
+      Services.wireAll(d); const sc=d.scenarios[0];
+      const collN=sc.utilityNodes.find(n=>n.kind==="dust_collector"), compN=sc.utilityNodes.find(n=>n.kind==="compressor");
+      const eruns=sc.utilityRuns.filter(r=>r.system==="electrical"&&r.toNodeId);
+      this.ok("POWER: a collector pulls a dedicated electrical run",eruns.some(r=>r.toNodeId===collN.id&&r.spec.dedicated));
+      this.ok("POWER: a compressor pulls a dedicated electrical run",eruns.some(r=>r.toNodeId===compN.id&&r.spec.dedicated));})();
+    (()=>{const d=Model.demo(); Model.addNode(d,"dust_collector");
+      this.ok("POWER: a collector with no panel is an error",Services.compute(d).records.some(x=>/needs power but no panel/.test(x.text)));})();
+    // v0.0.21: autosave
+    (()=>{let fired=0; const prev=History.onRecord; History.onRecord=()=>fired++;
+      const d=Model.emptyFacility(); History.reset(); History.record(d);
+      d.scenarios[0].placements.push({id:"x",defId:"builtin-drill-press",position:[1,1]}); History.record(d);
+      this.ok("AUTOSAVE: History fires onRecord on a real change",fired>=2,fired+" fires");
+      History.onRecord=prev; History.reset();})();
+    (()=>{ if(UI.storeAvailable()){
+        const saved=localStorage.getItem(UI.STORE_KEY); const savedDoc=UI.doc;
+        try{const d=Model.emptyFacility(); d.scenarios[0].placements=[{id:"a",defId:"builtin-drill-press",position:[10,10],rotation:0,mirrored:false}]; UI.doc=d;
+          const ok=UI.autosaveSave(); const back=UI.autosaveLoad();
+          this.ok("AUTOSAVE: round-trips the document through storage",ok&&back&&back.scenarios[0].placements.length===1);
+        } finally { UI.doc=savedDoc; if(saved!=null)localStorage.setItem(UI.STORE_KEY,saved); else try{localStorage.removeItem(UI.STORE_KEY);}catch(_){} }
+      } else this.ok("AUTOSAVE: degrades gracefully when storage is unavailable",UI.autosaveSave()===false); })();
+    // v0.0.22: tool tags, plat notes, full round-trip
+    (()=>{const d=Model.demo(); const sc=d.scenarios[0];
+      sc.placements[0].label="Main saw"; sc.placements[0].size=[90,30];
+      sc.annotations=[{id:"an1",position:[10,10],text:"outfeed\nhere"}];
+      d.meta.units="metric";
+      const out=Object.assign({},d); delete out.library;
+      const back=JSON.parse(JSON.stringify(out)); back.library=SEED.library;
+      this.ok("ROUNDTRIP: a tool tag survives export/import",back.scenarios[0].placements[0].label==="Main saw");
+      this.ok("ROUNDTRIP: a resized footprint survives export/import",back.scenarios[0].placements[0].size[0]===90);
+      this.ok("ROUNDTRIP: plat notes survive export/import",back.scenarios[0].annotations[0].text==="outfeed\nhere");
+      this.ok("ROUNDTRIP: the units setting survives export/import",back.meta.units==="metric");
+      this.ok("ROUNDTRIP: export omits the built-in library",out.library===undefined&&JSON.stringify(out).indexOf('"library"')===-1);
+      const r=History.restore(History.snapshot(d));
+      this.ok("NOTES: annotations survive snapshot/restore (autosave)",r.scenarios[0].annotations[0].text==="outfeed\nhere");})();
+    // v0.0.23: light fixtures + notes visibility
+    (()=>{const d=Model.demo(); Model.addNode(d,"panel"); for(let i=0;i<6;i++)Model.addNode(d,"light");
+      Services.wireAll(d); const p=Services.scenario(d).utilityNodes.find(n=>n.kind==="panel");
+      const lc=(p.spec.circuits||[]).filter(c=>c.kind==="light");
+      this.ok("LIGHTS: fixtures share a 15A lighting circuit",lc.length===1&&lc[0].amps===15&&lc[0].voltage===120);
+      this.ok("LIGHTS: the lighting load is not overloaded",!Services.compute(d).records.some(x=>/breaker/.test(x.text)));
+      this.ok("LIGHTS: takeoff tallies fixtures by wattage",Services.takeoff(d).lights.some(l=>l.watts===40&&l.count===6));})();
+    (()=>{const d=Model.demo(); Model.addNode(d,"light");
+      this.ok("LIGHTS: a light with no panel is an error",Services.compute(d).records.some(x=>/light fixtures are placed but no panel/.test(x.text)));})();
+    (()=>{const d=Model.demo(); d.scenarios[0].annotations=[{id:"a1",position:[50,50],text:"noteZ"}];
+      this.ok("NOTES: the plat can show or hide notes",/noteZ/.test(View.platSVG(d,"s1",{palette:"print",notes:true}).svg)&&!/noteZ/.test(View.platSVG(d,"s1",{palette:"print",notes:false}).svg));})();
     // PLAT
     (()=>{const d=Model.emptyFacility();
       d.scenarios[0].placements=[{id:"a",defId:"builtin-drill-press",position:[100,100],rotation:0,mirrored:false}];
