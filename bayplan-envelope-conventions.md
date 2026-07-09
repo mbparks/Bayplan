@@ -173,6 +173,14 @@ These are rule-of-thumb ceilings for typical single-stage and cyclone collectors
 
 Each machine carries a `PowerReq` (voltage, amps, phase, dedicated). When a panel exists, SERVICES rolls up connected load into a 120V bucket and a 240V bucket. Two checks apply: a machine that needs 240V when no panel supplies it is an error, and connected load past eighty percent of the largest panel's main is a warning. For the load-versus-main comparison, 120V loads are counted at half their amperage, since two 120V circuits share a 240V main. Panel defaults are a 240V service at 100A main with 20 spaces; these are editable per node.
 
+### Per-circuit assignment
+
+Beyond the whole-panel rollup, each electrical run is assigned to a specific circuit (breaker) on its panel. Wire all assigns automatically: a machine flagged `dedicated` gets its own breaker sized to the next standard rating above its load with the eighty-percent continuous-load margin applied, and non-dedicated machines pack into shared breakers of matching voltage while each breaker stays under eighty percent of its rating. Standard breaker sizes are 15, 20, 30, 40, 50, and 60A. A circuit whose connected load exceeds eighty percent of its breaker is a warning, and one that exceeds the breaker outright is an error, as is a run whose voltage is higher than its circuit's. Assignments can be overridden per run in the utilities panel.
+
+### Dust static pressure
+
+The dust-run budget (effective length versus a per-diameter ceiling) is a quick screen. The primary check is a static-pressure model. The collector carries a linear fan curve running from its rated free-air airflow at zero static pressure down to its shutoff static pressure at zero airflow. Each branch imposes a system curve, static pressure rising with airflow through the branch's diameter and effective length (straight run plus elbow equivalents), using a Darcy-style friction fit for smooth metal duct. The operating airflow is where the two curves cross, found by bisection. That delivered airflow is compared against a capture target, the airflow that sustains roughly a four-thousand foot-per-minute branch velocity, and a branch that delivers less than its target is a warning. The model omits hood entry losses and treats duct as smooth metal, so it is a design aid rather than a certified calculation.
+
 ---
 
 ## 7. PLAT title-block fields
