@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.33 | build-marker: header-groups-2026-07-09 -->
+<!-- BAYPLAN FI-075 | v0.0.34 | build-marker: systems-overview-2026-07-09 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -146,7 +146,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.33  (header reorganized into logical groups)
+   BAYPLAN FI-075  v0.0.34  (systems overview: full utilities rollup window)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -2321,6 +2321,130 @@ const UI = {
     a.download=(this.doc.meta.title||"bayplan").replace(/\s+/g,"-").toLowerCase()+"-plat.html";
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   },
+  showSystems(){
+    const doc=this.doc; const sc=Services.scenario(doc);
+    const nodes=sc.utilityNodes||[]; const runs=sc.utilityRuns||[];
+    const comp=Services.compute(doc); const take=Services.takeoff(doc);
+    const panels=nodes.filter(n=>n.kind==="panel"), collectors=nodes.filter(n=>n.kind==="dust_collector");
+    const compressors=nodes.filter(n=>n.kind==="compressor"), outlets=nodes.filter(n=>n.kind==="receptacle"), lights=nodes.filter(n=>n.kind==="light");
+    const metric=this.units()==="metric"; const L=ft=>metric?(ft*0.3048).toFixed(1)+" m":Math.ceil(ft)+" ft";
+    const mono="font-family:var(--font-mono); font-size:12px";
+    const table=rows=>`<table style="width:100%; border-collapse:collapse; ${mono}">${rows}</table>`;
+    const tr=(cells,head)=>`<tr>${cells.map((c,i)=>`<${head?"th":"td"} style="text-align:${i===0?"left":"right"}; padding:3px 6px; ${head?"color:var(--ink-dim); font-weight:600; border-bottom:1px solid var(--line)":"border-bottom:1px solid var(--panel-2)"}">${c}</${head?"th":"td"}>`).join("")}</tr>`;
+    const chip=(label,big,sub,color)=>`<div style="flex:1; min-width:132px; background:var(--panel); border:1px solid var(--line); border-left:3px solid ${color}; border-radius:6px; padding:8px 10px">
+      <div style="font-family:var(--font-mono); font-size:10px; letter-spacing:1px; text-transform:uppercase; color:var(--ink-dim)">${label}</div>
+      <div style="font-size:18px; margin-top:2px">${big}</div>
+      <div style="font-family:var(--font-mono); font-size:10.5px; color:var(--ink-dim); margin-top:1px">${sub}</div></div>`;
+    const sec=(title,html)=> html?`<div style="margin-top:18px"><h2 style="margin:0 0 6px; font-size:13px; letter-spacing:1.5px; text-transform:uppercase; border-bottom:1px solid var(--line); padding-bottom:4px">${title}</h2>${html}</div>`:"";
+    const nothing = !nodes.length && !runs.length;
+    let inner;
+    if(nothing){ inner=`<p class="empty" style="margin-top:14px">No utilities yet. Open the Utilities panel on the right, drop a panel, collector, compressor, outlets, and fixtures, then Wire all, and this overview fills in.</p>`; }
+    else {
+      const connected240=comp.load240+comp.load120/2; const mains=panels.map(p=>p.spec.mainAmps||100); const main=mains.length?Math.max(...mains):0;
+      const totalCircuits=panels.reduce((t,p)=>t+((p.spec.circuits||[]).length),0);
+      const anyOver=panels.some(p=>!Services.serviceLoad(doc,p).ok);
+      const collCfm=collectors.length?Math.max(...collectors.map(c=>c.spec.cfm||0)):0; const dustShort=comp.records.filter(r=>/dust/i.test(r.text)).length;
+      const cov=lights.length?Services.lightingCoverage(doc,{height:this.lightHeight||108}):{has:false};
+      const chips=`<div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px">
+        ${chip("Electrical", panels.length?`${Math.round(connected240)}A <span style="color:var(--ink-dim); font-size:12px">/ ${main}A</span>`:"\u2014", panels.length?`${panels.length} panel${panels.length>1?"s":""} \u00b7 ${totalCircuits} circuits`:"no panel", !panels.length?"var(--ink-dim)":anyOver?"var(--hard)":connected240>main*0.8?"var(--soft)":"var(--shared)")}
+        ${chip("Dust", collectors.length?`${collCfm} CFM`:"\u2014", collectors.length?`${comp.dustRunCount} run${comp.dustRunCount!==1?"s":""}${dustShort?` \u00b7 ${dustShort} short`:""}`:"no collector", !collectors.length?"var(--ink-dim)":dustShort?"var(--soft)":"var(--shared)")}
+        ${chip("Air", compressors.length?`${comp.airDemand}/${comp.airCapacity} <span style="color:var(--ink-dim); font-size:12px">CFM</span>`:"\u2014", compressors.length?`${comp.airRunCount} line${comp.airRunCount!==1?"s":""}`:"no compressor", !compressors.length?"var(--ink-dim)":comp.airDemand>comp.airCapacity?"var(--hard)":comp.airDemand>comp.airCapacity*0.8?"var(--soft)":"var(--shared)")}
+        ${chip("Lighting", lights.length&&cov.has?`${cov.avgFc.toFixed(0)} fc`:"\u2014", lights.length?`${lights.length} fixture${lights.length>1?"s":""} avg`:"no fixtures", !lights.length?"var(--ink-dim)":(cov.has&&cov.avgFc>=30)?"var(--shared)":"var(--soft)")}
+      </div>`;
+      let elecHtml="";
+      if(panels.length){
+        for(const p of panels){const sl=Services.serviceLoad(doc,p); const sch=Services.panelSchedule(doc,p); const rep=Services.circuitReport(doc,p);
+          const cmap={}; for(const c of (p.spec.circuits||[]))cmap[c.id]=c;
+          const cd=rep.map(c=>tr([`<b>${c.label}</b>`, `${c.amps}A${c.voltage>=240?" 2p":""}`, Services.circuitDesc(doc,p,cmap[c.id]), `<span style="color:${c.over?"var(--hard)":c.hot?"var(--soft)":"var(--ink-dim)"}">${c.load.toFixed(1)}/${c.amps}A</span>`])).join("");
+          elecHtml+=`<div style="margin-top:10px"><div style="${mono}">${p.label} \u00b7 ${p.spec.voltage||240}V \u00b7 ${p.spec.mainAmps||100}A main \u00b7 ${sch.polesUsed}/${sch.spaces} spaces \u00b7 ${sl.ok?`<span style="color:var(--shared)">covers, ${sl.headroomPct.toFixed(0)}% headroom</span>`:`<span style="color:var(--hard)">over by ${(sl.demandAmps-sl.mainAmps).toFixed(0)}A; ${sl.suggestedMain}A suggested</span>`}</div>`;
+          elecHtml+= rep.length? `<div style="margin-top:4px">`+table(tr(["Circuit","Breaker","Feeds","Load"],true)+cd)+`</div>` : `<p class="empty" style="${mono}; font-size:11px">No circuits yet. Wire all in the Utilities panel.</p>`;
+          elecHtml+=`</div>`;}
+        const machinesWired=new Set(runs.filter(r=>r.system==="electrical"&&r.toPlacementId).map(r=>r.toPlacementId)).size;
+        const dedicated=panels.reduce((t,p)=>t+((p.spec.circuits||[]).filter(c=>c.dedicated).length),0);
+        elecHtml+=`<div style="margin-top:6px; ${mono}; font-size:11px; color:var(--ink-dim)">${outlets.length} outlet${outlets.length!==1?"s":""} \u00b7 ${lights.length} fixture${lights.length!==1?"s":""} \u00b7 ${machinesWired} machine${machinesWired!==1?"s":""} on circuits \u00b7 ${dedicated} dedicated</div>`;
+      } else if(outlets.length||lights.length||collectors.length||compressors.length){
+        elecHtml=`<p class="empty" style="${mono}; color:var(--hard)">Loads are placed but no panel supplies them.</p>`;}
+      let dustHtml="";
+      if(collectors.length||comp.dustRunCount){
+        dustHtml+=collectors.map(c=>`<div style="${mono}">${c.label} \u00b7 ${c.spec.cfm||0} CFM \u00b7 ${c.spec.staticPressure||0} in SP</div>`).join("");
+        const dr=runs.filter(r=>r.system==="dust");
+        if(dr.length){const rows=dr.map(r=>{const rep=Services.dustRunReport(doc,r); const spx=Services.dustRunSP(doc,r);
+            const pl=sc.placements.find(x=>x.id===r.toPlacementId); const nm=pl?(pl.label||(Model.def(pl.defId)||{}).name||"?"):"?";
+            return tr([nm, `${rep.diameter}in`, `${rep.effectiveFt.toFixed(0)} ft${rep.over?" \u26a0":""}`, `<span style="color:${spx.under?"var(--soft)":"var(--shared)"}">${spx.deliveredCfm.toFixed(0)}/${spx.targetCfm}</span>`]);}).join("");
+          dustHtml+=`<div style="margin-top:8px">`+table(tr(["Branch","Duct","Eff. length","CFM del/target"],true)+rows)+`</div>`;}
+        const ductFt=(take.duct||[]).reduce((t,x)=>t+x.ft,0);
+        dustHtml+=`<div style="margin-top:6px; ${mono}; font-size:11px; color:var(--ink-dim)">${comp.dustRunCount} run${comp.dustRunCount!==1?"s":""} \u00b7 ${L(ductFt)} duct \u00b7 longest ${L(comp.longestDustFt)} effective</div>`;}
+      let airHtml="";
+      if(compressors.length||comp.airRunCount){
+        airHtml+=compressors.map(c=>`<div style="${mono}">${c.label} \u00b7 ${c.spec.scfm||0} SCFM \u00b7 ${c.spec.psi||0} PSI</div>`).join("");
+        const cap=comp.airCapacity||1; const pct=Math.min(100,comp.airDemand/cap*100);
+        const barColor=comp.airDemand>cap?"var(--hard)":comp.airDemand>cap*0.8?"var(--soft)":"var(--shared)";
+        airHtml+=`<div style="margin-top:8px; display:flex; align-items:center; gap:8px; ${mono}; font-size:11px"><span style="width:150px">demand ${comp.airDemand} / ${comp.airCapacity} CFM</span><div style="flex:1; height:12px; background:var(--panel); border:1px solid var(--line); border-radius:3px; overflow:hidden"><div style="width:${pct.toFixed(0)}%; height:100%; background:${barColor}; opacity:.6"></div></div></div>`;
+        const ar=runs.filter(r=>r.system==="air");
+        if(ar.length){const rows=ar.map(r=>{const pl=sc.placements.find(x=>x.id===r.toPlacementId); const nm=pl?(pl.label||(Model.def(pl.defId)||{}).name||"?"):"?"; return tr([nm, `${r.spec.cfm||0} CFM`]);}).join("");
+          airHtml+=`<div style="margin-top:8px">`+table(rows)+`</div>`;}
+        airHtml+=`<div style="margin-top:6px; ${mono}; font-size:11px; color:var(--ink-dim)">${L(take.airFt||0)} air line</div>`;}
+      let ltHtml="";
+      if(lights.length){const totalW=lights.reduce((t,n)=>t+(n.spec.watts||40),0);
+        ltHtml+=`<div style="${mono}">${lights.length} fixture${lights.length>1?"s":""} \u00b7 ${totalW} W \u00b7 ${(totalW/120).toFixed(1)}A on lighting circuits</div>`;
+        if(cov.has){const verdict=cov.avgFc>=50?`<span style="color:var(--shared)">well lit</span>`:cov.avgFc>=30?`<span style="color:var(--soft)">adequate</span>`:`<span style="color:var(--hard)">dim</span>`;
+          ltHtml+=`<div style="margin-top:4px; ${mono}">average ${cov.avgFc.toFixed(0)} fc \u00b7 ${verdict} \u00b7 ${cov.pctGeneral.toFixed(0)}% of floor \u2265 30 fc</div>`;}}
+      let issHtml="";
+      if(comp.records.length){const dot=s=>`<span style="color:${s==="error"?"var(--hard)":"var(--soft)"}">\u25c9</span>`;
+        const sorted=comp.records.slice().sort((a,b)=>Services.rankSev(b.sev)-Services.rankSev(a.sev));
+        issHtml=`<div style="${mono}; font-size:11px; margin-bottom:4px"><span style="color:var(--hard)">${comp.errors} error${comp.errors!==1?"s":""}</span> \u00b7 <span style="color:var(--soft)">${comp.warnings} warning${comp.warnings!==1?"s":""}</span></div>`
+          +sorted.map(r=>`<div style="display:flex; gap:8px; padding:2px 0; ${mono}"><span>${dot(r.sev)}</span><span>${r.text.replace(/</g,"&lt;")}</span></div>`).join("");}
+      else issHtml=`<div style="${mono}; color:var(--shared)">\u2713 utilities check clean</div>`;
+      inner=chips+sec("Electrical",elecHtml)+sec("Dust collection",dustHtml)+sec("Compressed air",airHtml)+sec("Lighting",ltHtml)+sec("Open items",issHtml)
+        +`<div style="margin-top:16px"><button id="sysPrint">Print / PDF</button></div>`;
+    }
+    document.getElementById("app").innerHTML=`<div id="compare">
+      <h1>Systems overview</h1>
+      <p style="color:var(--ink-dim); font-size:12.5px; margin:0">The whole utility picture for the active scenario in one place: power, dust, air, and light, with the circuits, branches, and open items rolled up. Panel, Lighting, and Egress drill into the details.</p>
+      ${inner}
+      <p style="margin-top:16px"><a href="#" onclick="UI.render();return false">\u2190 back to plat</a></p>
+    </div>`;
+    const sysP=document.getElementById("sysPrint"); if(sysP)sysP.onclick=()=>this.printSystems();
+  },
+  printSystems(){
+    const doc=this.doc; const sc=Services.scenario(doc); const comp=Services.compute(doc); const take=Services.takeoff(doc);
+    const panels=(sc.utilityNodes||[]).filter(n=>n.kind==="panel");
+    const collectors=(sc.utilityNodes||[]).filter(n=>n.kind==="dust_collector"), compressors=(sc.utilityNodes||[]).filter(n=>n.kind==="compressor");
+    const lights=(sc.utilityNodes||[]).filter(n=>n.kind==="light");
+    const d=this.doc.meta; if(!d.date)d.date=new Date().toISOString().slice(0,10);
+    const scn=(this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId)||{}).name||"";
+    const styleEl=document.getElementById("printPageStyle")||(()=>{const s=document.createElement("style");s.id="printPageStyle";document.head.appendChild(s);return s;})();
+    styleEl.textContent=`@media print{@page{size:8.5in 11in; margin:0.6in;}
+      #printSheet .tk{color:#141414; font-family:"Iowan Old Style",Palatino,Georgia,serif;}
+      #printSheet .tk-top{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #141414; padding-bottom:6px;}
+      #printSheet .tk-title{font-size:20px; letter-spacing:1px; margin:0;} #printSheet .tk-sub{font-size:10px; color:#555; letter-spacing:2px; text-transform:uppercase; margin:2px 0 0;}
+      #printSheet .tk-meta{font-family:ui-monospace,Menlo,monospace; font-size:9.5px; color:#444; text-align:right; line-height:1.5;}
+      #printSheet .sy-h{font-size:11px; letter-spacing:2px; text-transform:uppercase; border-bottom:1px solid #bbb; padding-bottom:3px; margin:14px 0 4px; break-after:avoid;}
+      #printSheet table.sy{width:100%; border-collapse:collapse; font-family:ui-monospace,Menlo,monospace; font-size:9.5px;}
+      #printSheet table.sy td,#printSheet table.sy th{padding:2px 5px; border-bottom:1px solid #e6e6e6; text-align:right;} #printSheet table.sy td:first-child,#printSheet table.sy th:first-child{text-align:left;}
+      #printSheet .sy-line{font-family:ui-monospace,Menlo,monospace; font-size:10px; color:#333; line-height:1.6;}
+      #printSheet .tk-foot{margin-top:18px; border-top:1px solid #bbb; padding-top:5px; font-family:ui-monospace,Menlo,monospace; font-size:8.5px; color:#888; letter-spacing:1px; display:flex; justify-content:space-between;} }`;
+    const L=ft=>Math.ceil(ft)+" ft";
+    let body="";
+    for(const p of panels){const sl=Services.serviceLoad(doc,p); const sch=Services.panelSchedule(doc,p); const rep=Services.circuitReport(doc,p); const cmap={}; for(const c of (p.spec.circuits||[]))cmap[c.id]=c;
+      body+=`<div class="sy-h">Electrical \u00b7 ${p.label}</div><div class="sy-line">${p.spec.voltage||240}V \u00b7 ${p.spec.mainAmps||100}A main \u00b7 ${sch.polesUsed}/${sch.spaces} spaces \u00b7 ${sl.ok?`covers, ${sl.headroomPct.toFixed(0)}% headroom`:`over by ${(sl.demandAmps-sl.mainAmps).toFixed(0)}A, ${sl.suggestedMain}A suggested`}</div>`;
+      if(rep.length)body+=`<table class="sy"><tr><th>Circuit</th><th>Breaker</th><th>Feeds</th><th>Load</th></tr>${rep.map(c=>`<tr><td>${c.label}</td><td>${c.amps}A${c.voltage>=240?" 2p":""}</td><td>${Services.circuitDesc(doc,p,cmap[c.id])}</td><td>${c.load.toFixed(1)}/${c.amps}A</td></tr>`).join("")}</table>`;}
+    const dr=(sc.utilityRuns||[]).filter(r=>r.system==="dust");
+    if(collectors.length||dr.length){body+=`<div class="sy-h">Dust collection</div><div class="sy-line">${collectors.map(c=>`${c.label}: ${c.spec.cfm||0} CFM, ${c.spec.staticPressure||0} in SP`).join(" \u00b7 ")||"no collector"}</div>`;
+      if(dr.length)body+=`<table class="sy"><tr><th>Branch</th><th>Duct</th><th>Eff. length</th><th>CFM del/target</th></tr>${dr.map(r=>{const rep=Services.dustRunReport(doc,r); const spx=Services.dustRunSP(doc,r); const pl=sc.placements.find(x=>x.id===r.toPlacementId); const nm=pl?(pl.label||(Model.def(pl.defId)||{}).name||"?"):"?"; return `<tr><td>${nm}</td><td>${rep.diameter}in</td><td>${rep.effectiveFt.toFixed(0)} ft</td><td>${spx.deliveredCfm.toFixed(0)}/${spx.targetCfm}</td></tr>`;}).join("")}</table>`;}
+    if(compressors.length||comp.airRunCount){body+=`<div class="sy-h">Compressed air</div><div class="sy-line">${compressors.map(c=>`${c.label}: ${c.spec.scfm||0} SCFM, ${c.spec.psi||0} PSI`).join(" \u00b7 ")||"no compressor"} \u00b7 demand ${comp.airDemand} / ${comp.airCapacity} CFM \u00b7 ${L(take.airFt||0)} line</div>`;}
+    if(lights.length){const totalW=lights.reduce((t,n)=>t+(n.spec.watts||40),0); const cov=Services.lightingCoverage(doc,{height:this.lightHeight||108});
+      body+=`<div class="sy-h">Lighting</div><div class="sy-line">${lights.length} fixtures \u00b7 ${totalW} W \u00b7 ${cov.has?`average ${cov.avgFc.toFixed(0)} fc`:"no room"}</div>`;}
+    body+=`<div class="sy-h">Open items</div>`;
+    body+= comp.records.length? `<div class="sy-line">`+comp.records.slice().sort((a,b)=>Services.rankSev(b.sev)-Services.rankSev(a.sev)).map(r=>`[${r.sev==="error"?"!":"\u25b3"}] ${r.text}`).join("<br>")+`</div>` : `<div class="sy-line">All clear.</div>`;
+    document.getElementById("printSheet").innerHTML=`<div class="tk">
+      <div class="tk-top"><div><h1 class="tk-title">${(d.title||"Untitled").toUpperCase()}</h1><p class="tk-sub">Utilities Schedule</p></div>
+        <div class="tk-meta">${scn?scn.toUpperCase()+"<br>":""}${d.date}<br>REV ${d.revision||"A"}<br>${comp.errors} err \u00b7 ${comp.warnings} warn</div></div>
+      ${body}
+      <div class="tk-foot"><span>BAYPLAN FI-075 \u00b7 GREEN SHOE GARAGE</span><span>planning schedule; verify against installed systems and local code</span></div>
+    </div>`;
+    window.print();
+  },
   printSetup(){
     if(!this.printOpts) this.printOpts={paper:"letter",orient:"auto",scale:"fit"};
     const o=this.printOpts;
@@ -2428,6 +2552,7 @@ const UI = {
           </span>
           <span class="div"></span>
           <span class="grp" aria-label="Reports">
+            <button id="systemsBtn" title="Utilities overview: power, dust, air, light">Systems</button>
             <button id="checkBtn" title="Readiness punch list" style="color:${readyColor}">${readyBadge}</button>
             <button id="takeoffBtn" title="Materials shopping list">Takeoff</button>
             <button id="panelBtn" title="Panel schedule">Panel</button>
@@ -2505,6 +2630,7 @@ const UI = {
     document.getElementById("panelBtn").onclick=()=>this.showPanelSchedule();
     document.getElementById("lightingBtn").onclick=()=>this.showLighting();
     document.getElementById("checkBtn").onclick=()=>this.showPunchList();
+    document.getElementById("systemsBtn").onclick=()=>this.showSystems();
     document.getElementById("egressBtn").onclick=()=>this.showCirculation();
     for(const b of document.querySelectorAll("[data-scenario]")) b.onclick=()=>this.switchScenario(b.dataset.scenario);
     document.getElementById("importBtn").onclick=()=>{const inp=document.createElement("input");
@@ -3359,6 +3485,16 @@ const Tests = {
       const v2=View.clampView({x:0,y:0,w:10,h:5});
       this.ok("TOUCH: clampView enforces a minimum zoom and holds aspect",Math.abs(v2.w-1000/14)<1e-6&&Math.abs(v2.h-v2.w*0.5)<1e-6);
       View._vbFull=save.vbFull; View._view=save.view; View._zoomed=save.zoomed;})();
+    // v0.0.34: systems overview (rollup data across power/dust/air/light)
+    (()=>{const saveDoc=Model._doc; const d=Model.demo(); Model._doc=d;
+      const pn=Model.addNode(d,"panel"); pn.spec={voltage:240,mainAmps:100,spaces:20};
+      const coll=Model.addNode(d,"dust_collector"); coll.spec={cfm:1200,staticPressure:10,voltage:240,amps:15,dedicated:true};
+      for(let i=0;i<4;i++){const o=Model.addNode(d,"receptacle"); o.spec={voltage:120,amps:20};}
+      Services.wireAll(d); const comp=Services.compute(d); const p=Services.scenario(d).utilityNodes.find(n=>n.kind==="panel");
+      this.ok("SYSTEMS: the overview rollup data resolves across power, dust, air, and light",
+        Array.isArray(comp.records) && typeof Services.serviceLoad(d,p).ok==="boolean" && Services.circuitReport(d,p).length>0 &&
+        Services.scenario(d).utilityRuns.filter(r=>r.system==="dust").every(r=>Services.dustRunSP(d,r).targetCfm>0));
+      Model._doc=saveDoc;})();
     // PLAT
     (()=>{const d=Model.emptyFacility();
       d.scenarios[0].placements=[{id:"a",defId:"builtin-drill-press",position:[100,100],rotation:0,mirrored:false}];
