@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.28 | build-marker: dimensions-2026-07-08 -->
+<!-- BAYPLAN FI-075 | v0.0.32 | build-marker: touch-pass-2026-07-08 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -63,7 +63,14 @@
   .seg button[aria-pressed="true"]{background:var(--brass); color:#111}
   main{flex:1; display:flex; min-height:0}
   .stage{flex:1; position:relative; overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none}
-  svg{width:100%; height:100%; display:block}
+  svg{width:100%; height:100%; display:block; touch-action:none}
+  /* touch: bigger tap targets, room to breathe */
+  @media (pointer:coarse){
+    button{padding:11px 14px; font-size:13px; min-height:44px}
+    .toolbar{gap:6px}
+    .shelf button{padding:11px 12px}
+    .shelf{max-height:38vh}
+  }
   aside{
     width:288px; border-left:1px solid var(--line); background:var(--panel);
     padding:14px 16px; overflow:auto;
@@ -137,7 +144,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.28  (dimension annotations: permanent dimension lines)
+   BAYPLAN FI-075  v0.0.32  (touch pass: pinch-zoom, pan, larger tap targets)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -339,15 +346,41 @@ const Trim = {
 
 /* ---- document model ---- */
 const Model = {
-  library(){return SEED.library;},
-  def(id){return SEED.library.find(m=>m.id===id);},
+  _doc:null,
+  library(){return SEED.library.concat((this._doc&&this._doc.userLibrary)||[]);},
+  userDefs(){return (this._doc&&this._doc.userLibrary)||[];},
+  def(id){return SEED.library.find(m=>m.id===id) || this.userDefs().find(m=>m.id===id);},
   _seq:100,
   newId(){return "p"+(++this._seq);},
+  _useq:0,
+  makeUserDef(spec){
+    const W=Math.max(4,+spec.width||24), D=Math.max(4,+spec.depth||24);
+    const foot={vertices:[[-W/2,-D/2],[W/2,-D/2],[W/2,D/2],[-W/2,D/2]]};
+    const clr=[]; const sev=spec.severity||"soft";
+    for(const edge of ["front","back","left","right"]){const depth=+((spec.clear||{})[edge])||0;
+      if(depth>0) clr.push({shape:"rect",geometry:{edge,depth},label:edge,severity:sev,minHeight:null,note:""});}
+    const amps=+spec.amps||0, volts=+spec.voltage||120;
+    const power = amps>0 ? {voltage:volts,amps,phase:1,dedicated:(amps>=30||volts>=240)} : null;
+    const id="user-"+Date.now().toString(36)+"-"+(++this._useq);
+    return {id, name:(spec.name||"Custom machine").trim(), category:(spec.category||"custom").trim()||"custom",
+      provenance:{source:"user",qmAssetId:null,seededFields:[],seededAt:null,localEdits:[]},
+      footprint:foot, anchor:[0,0], anchorNote:"center",
+      height:+spec.height||36, weight:+spec.weight||0,
+      power,
+      dustPort: spec.dust? {position:[0,0],diameter:+spec.dustDia||4} : null,
+      airPort: spec.air? {position:[0,0],cfm:+spec.airCfm||5} : null,
+      clearances:clr,
+      ports:[{id:"in",label:"stock_in",position:[0,-D/2]},{id:"out",label:"stock_out",position:[0,D/2]}]};
+  },
+  addUserMachine(doc,spec){ if(!doc.userLibrary)doc.userLibrary=[]; const def=this.makeUserDef(spec); doc.userLibrary.push(def); return def;},
+  userMachineInUse(doc,id){return doc.scenarios.some(s=>(s.placements||[]).some(p=>p.defId===id));},
+  removeUserMachine(doc,id){ if(this.userMachineInUse(doc,id))return false;
+    doc.userLibrary=(doc.userLibrary||[]).filter(m=>m.id!==id); return true;},
   emptyFacility(){return {schemaVersion:"1.0.0",
     meta:{title:"Untitled",units:"imperial",gridSpacing:12,revision:"A",author:"M.B. Parks",date:null},
     facility:{id:"f1",name:"Shop",boundary:{vertices:[[0,0],[288,0],[288,216],[0,216]]},
       ceilingHeight:108,northOffset:0,features:[]},
-    library:SEED.library,
+    library:SEED.library, userLibrary:[],
     scenarios:[{id:"s1",name:"Current",placements:[],utilityNodes:[],utilityRuns:[],flows:[],annotations:[],dimensions:[],notes:""}],
     activeScenarioId:"s1"};},
   _sseq:1, newScenarioId(){return "s"+(++this._sseq);},
@@ -431,7 +464,7 @@ const Model = {
     d.meta=d.meta||{};
     for(const s of d.scenarios){ s.placements=s.placements||[]; s.flows=s.flows||[];
       s.utilityNodes=s.utilityNodes||[]; s.utilityRuns=s.utilityRuns||[]; s.annotations=s.annotations||[]; s.dimensions=s.dimensions||[]; }
-    d.library=SEED.library; return d;});}
+    d.library=SEED.library; d.userLibrary=Array.isArray(d.userLibrary)?d.userLibrary:[]; return d;});}
 };
 
 /* ---- ROUTING: flow waypoints + derived metrics ---- */
@@ -803,13 +836,91 @@ const Services = {
       const sl=this.serviceLoad(doc,p);
       if(!sl.ok) items.push({sev:"error",group:"Panel",text:`${p.label} demand ${sl.demandAmps.toFixed(0)}A exceeds the ${sl.mainAmps}A service (a ${sl.suggestedMain}A service is suggested)`});
     }
-    const ORDER=["Clearances","Electrical","Panel","Dust","Air","Utilities"];
+    try{ for(const f of this.circulation(doc,{cells:false}).findings) items.push({sev:f.sev,text:f.text,group:"Circulation"}); }catch(_){}
+    const ORDER=["Clearances","Circulation","Electrical","Panel","Dust","Air","Utilities"];
     items.sort((a,b)=>(this.rankSev(b.sev)-this.rankSev(a.sev))||(ORDER.indexOf(a.group)-ORDER.indexOf(b.group)));
     const errors=items.filter(i=>i.sev==="error").length;
     const warnings=items.filter(i=>i.sev==="warning").length;
     return {items, errors, warnings, clear:items.length===0};
   },
   rankSev(s){return s==="error"?2:s==="warning"?1:0;},
+  // circulation / egress: grid clearance transform + door reachability at a walking and a material width
+  circulation(doc,opt={}){
+    const personW=opt.personW||36, materialW=opt.materialW||48;
+    const fac=doc.facility; const sc=this.scenario(doc);
+    const V=fac.boundary.vertices; const fb=G.bounds(fac.boundary);
+    const cell=Math.max(4,Math.round(Math.max(fb.maxX-fb.minX,fb.maxY-fb.minY)/60));
+    const nx=Math.max(1,Math.ceil((fb.maxX-fb.minX)/cell)), ny=Math.max(1,Math.ceil((fb.maxY-fb.minY)/cell));
+    const idx=(i,j)=>j*nx+i, CX=i=>fb.minX+(i+0.5)*cell, CY=j=>fb.minY+(j+0.5)*cell;
+    const obstacles=[]; const owners=[];
+    for(const pl of sc.placements){const def=Model.def(pl.defId); if(def){obstacles.push(G.footprintWorldPoly(def,pl)); owners.push(pl.id);}}
+    for(const f of (fac.features||[])) if(f.kind==="column"){obstacles.push(Feat.columnPoly(f)); owners.push(null);}
+    const blocked=new Uint8Array(nx*ny); const owner=new Array(nx*ny).fill(null);
+    for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const p=[CX(i),CY(j)]; const k=idx(i,j);
+      if(!G.pointInPolygon(p,V)){blocked[k]=1; continue;}
+      for(let o=0;o<obstacles.length;o++){ if(G.pointInPolygon(p,obstacles[o])){blocked[k]=1; owner[k]=owners[o]; break;} }
+    }
+    const INF=1e9; const dist=new Float64Array(nx*ny); dist.fill(INF);
+    for(let k=0;k<nx*ny;k++) if(blocked[k]) dist[k]=0;
+    const S2=Math.SQRT2;
+    for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const k=idx(i,j); if(blocked[k])continue; let d=dist[k];
+      if(i>0)d=Math.min(d,dist[idx(i-1,j)]+1); if(j>0)d=Math.min(d,dist[idx(i,j-1)]+1);
+      if(i>0&&j>0)d=Math.min(d,dist[idx(i-1,j-1)]+S2); if(i<nx-1&&j>0)d=Math.min(d,dist[idx(i+1,j-1)]+S2); dist[k]=d;}
+    for(let j=ny-1;j>=0;j--)for(let i=nx-1;i>=0;i--){const k=idx(i,j); if(blocked[k])continue; let d=dist[k];
+      if(i<nx-1)d=Math.min(d,dist[idx(i+1,j)]+1); if(j<ny-1)d=Math.min(d,dist[idx(i,j+1)]+1);
+      if(i<nx-1&&j<ny-1)d=Math.min(d,dist[idx(i+1,j+1)]+S2); if(i>0&&j<ny-1)d=Math.min(d,dist[idx(i-1,j+1)]+S2); dist[k]=d;}
+    const clearIn=k=>blocked[k]?0:dist[k]*cell; // distance to nearest obstacle/wall
+    // door thresholds
+    const doors=(fac.features||[]).filter(f=>f.kind==="door");
+    const doorPos=doors.map(dr=>dr.position);
+    const NB=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+    // passable network at width W: seed just inside each door at the first cell wide enough, flood through cells with clearance >= W/2
+    const reachAt=(W)=>{const need=W/2; const cap=Math.max(2*W,60); const seen=new Uint8Array(nx*ny); const q=[];
+      for(const dp of doorPos){ let best=-1,bd=cap;
+        for(let k=0;k<nx*ny;k++){ if(blocked[k]||clearIn(k)<need)continue; const i=k%nx,j=(k-i)/nx;
+          const d=Math.hypot(CX(i)-dp[0],CY(j)-dp[1]); if(d<bd){bd=d;best=k;} }
+        if(best>=0&&!seen[best]){seen[best]=1;q.push(best);} }
+      while(q.length){const k=q.pop(); const i=k%nx,j=(k-i)/nx;
+        for(const nb of NB){const ni=i+nb[0],nj=j+nb[1]; if(ni<0||nj<0||ni>=nx||nj>=ny)continue;
+          const nk=idx(ni,nj); if(seen[nk]||blocked[nk]||clearIn(nk)<need)continue; seen[nk]=1; q.push(nk);}}
+      return seen;};
+    // dilate the network into free space so an aisle reaches the machines beside it
+    const dilate=(seen,steps)=>{let cur=seen; for(let s=0;s<steps;s++){const nxt=new Uint8Array(cur);
+      for(let k=0;k<nx*ny;k++){ if(!cur[k])continue; const i=k%nx,j=(k-i)/nx;
+        for(const nb of NB){const ni=i+nb[0],nj=j+nb[1]; if(ni<0||nj<0||ni>=nx||nj>=ny)continue; const nk=idx(ni,nj); if(!blocked[nk])nxt[nk]=1;}}
+      cur=nxt;} return cur;};
+    const reachDil=(W)=>dilate(reachAt(W), Math.ceil((W/2)/cell)+1);
+    // access cells per machine (free neighbors of its footprint cells)
+    const access={};
+    for(let k=0;k<nx*ny;k++){ if(!blocked[k]||!owner[k])continue; const i=k%nx,j=(k-i)/nx;
+      for(const nb of NB){const ni=i+nb[0],nj=j+nb[1]; if(ni<0||nj<0||ni>=nx||nj>=ny)continue;
+        const nk=idx(ni,nj); if(!blocked[nk]){(access[owner[k]]=access[owner[k]]||new Set()).add(nk);}}}
+    const personSeen=reachAt(personW), materialSeen=reachAt(materialW);
+    const personDil=reachDil(personW), materialDil=reachDil(materialW);
+    const reachIn=(plId,seen)=>{const a=access[plId]; if(!a)return false; for(const c of a) if(seen[c])return true; return false;};
+    const machines=sc.placements.map(pl=>{const def=Model.def(pl.defId);
+      return {id:pl.id, name:pl.label||(def&&def.name)||"machine",
+        person:reachIn(pl.id,personDil), material:reachIn(pl.id,materialDil)};});
+    let aisleWidth=0;
+    if(machines.length && doorPos.length){ for(let W=personW;W<=72;W+=4){const seen=reachDil(W);
+      if(sc.placements.every(pl=>reachIn(pl.id,seen))) aisleWidth=W; else break; } }
+    const narrowestDoor=doors.length?Math.min(...doors.map(d=>d.width||32)):null;
+    // findings for the punch list
+    const findings=[];
+    if(machines.length && !doors.length) findings.push({sev:"warning",text:`no door placed; egress cannot be checked`});
+    for(const m of machines){ if(doors.length && !m.person) findings.push({sev:"error",text:`${m.name} has no ${personW}in clear path to a door`});
+      else if(doors.length && m.person && !m.material) findings.push({sev:"warning",text:`${m.name} cannot be reached with a ${materialW}in material path`}); }
+    if(narrowestDoor!=null && narrowestDoor<materialW && machines.length) findings.push({sev:"warning",text:`the narrowest door is ${narrowestDoor}in; a ${materialW}in sheet will not pass`});
+    // render cells
+    let cells=null;
+    if(opt.cells!==false){ cells=[];
+      for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const k=idx(i,j); if(blocked[k]){cells.push({px:CX(i),py:CY(j),blocked:true,owner:owner[k]}); continue;}
+        cells.push({px:CX(i),py:CY(j),blocked:false,widthIn:2*clearIn(k),reachP:!!personDil[k],reachM:!!materialDil[k]});}}
+    return {has:true, cell, nx, ny, minX:fb.minX, minY:fb.minY, maxX:fb.maxX, maxY:fb.maxY,
+      personW, materialW, aisleWidth, narrowestDoor, hasDoor:doors.length>0,
+      doorPts:doorPos.slice(),
+      machines, findings, cells};
+  },
   compute(doc){
     const sc=this.scenario(doc); const recs=[]; const runs=sc.utilityRuns||[];
     // dust
@@ -952,7 +1063,23 @@ const History = {
 
 /* ---- render + interaction ---- */
 const View = {
-  el:null,doc:null,pad:24,_b:null,_H:0,conflicts:null,
+  el:null,doc:null,pad:24,_b:null,_H:0,conflicts:null,_view:null,_zoomed:false,_vbFull:null,
+  // zoom/pan: _view is a window {x,y,w,h} into viewBox space; _zoomed persists it, else it tracks the full plat
+  clampView(v){const f=this._vbFull; if(!f)return v; const minW=f.w/14;
+    v.w=Math.min(f.w,Math.max(minW,v.w)); v.h=v.w*(f.h/f.w);
+    v.x=Math.min(f.w-v.w,Math.max(0,v.x)); v.y=Math.min(f.h-v.h,Math.max(0,v.y)); return v;},
+  clientToV(cx,cy,view,rect){const s=Math.min(rect.width/view.w,rect.height/view.h)||1;
+    const ox=(rect.width-view.w*s)/2, oy=(rect.height-view.h*s)/2;
+    return [view.x+(cx-rect.left-ox)/s, view.y+(cy-rect.top-oy)/s];},
+  applyViewBox(){const svg=this.el&&this.el.querySelector("svg"); const v=this._view;
+    if(svg&&v)svg.setAttribute("viewBox",`${v.x.toFixed(2)} ${v.y.toFixed(2)} ${v.w.toFixed(2)} ${v.h.toFixed(2)}`);},
+  resetView(){this._zoomed=false; this.draw();},
+  zoomAt(cx,cy,factor){const svg=this.el&&this.el.querySelector("svg"); if(!svg||!this._view)return;
+    const rect=svg.getBoundingClientRect(); const at=this.clientToV(cx,cy,this._view,rect);
+    const v={...this._view}; v.w=v.w*factor; this.clampView(v);
+    const s=Math.min(rect.width/v.w,rect.height/v.h)||1; const ox=(rect.width-v.w*s)/2, oy=(rect.height-v.h*s)/2;
+    v.x=at[0]-(cx-rect.left-ox)/s; v.y=at[1]-(cy-rect.top-oy)/s; this.clampView(v);
+    this._view=v; this._zoomed=true; this.applyViewBox();},
   mount(el){this.el=el; if(el&&el.style)el.style.touchAction="none"; this.bindPointer();},
   scene(doc){this.doc=doc; this.conflicts=Trim.compute(doc); this.draw(); UI.syncPanels(); History.record(doc);},
   refresh(){this.conflicts=Trim.compute(this.doc); this.draw(); UI.syncPanels(); History.record(this.doc);},
@@ -960,11 +1087,11 @@ const View = {
   screenToWorld(clientX,clientY){
     const svg=this.el.querySelector("svg"); if(!svg||!this._b) return [0,0];
     const rect=svg.getBoundingClientRect();
-    const vbW=(this._b.maxX-this._b.minX)+this.pad*2, vbH=(this._b.maxY-this._b.minY)+this.pad*2;
-    // invert preserveAspectRatio="xMidYMid meet": uniform scale to fit, content centered
-    const scale=Math.min(rect.width/vbW, rect.height/vbH) || 1;
-    const offX=(rect.width - vbW*scale)/2, offY=(rect.height - vbH*scale)/2;
-    const vx=(clientX-rect.left-offX)/scale, vy=(clientY-rect.top-offY)/scale;
+    const vb=this._view||{x:0,y:0,w:(this._b.maxX-this._b.minX)+this.pad*2,h:(this._b.maxY-this._b.minY)+this.pad*2};
+    // invert preserveAspectRatio="xMidYMid meet" for the current view window
+    const scale=Math.min(rect.width/vb.w, rect.height/vb.h) || 1;
+    const offX=(rect.width - vb.w*scale)/2, offY=(rect.height - vb.h*scale)/2;
+    const vx=vb.x+(clientX-rect.left-offX)/scale, vy=vb.y+(clientY-rect.top-offY)/scale;
     return [vx-this.pad+this._b.minX, this._b.minY+this._H+this.pad-vy];},
   polyStr(pts){return pts.map(p=>this.toScreen(p).join(",")).join(" ");},
   units(){return (this.doc&&this.doc.meta&&this.doc.meta.units)||"imperial";},
@@ -979,6 +1106,8 @@ const View = {
     const fb=G.bounds(fac.boundary); this._b=fb;
     const W=fb.maxX-fb.minX,H=fb.maxY-fb.minY; this._H=H;
     const vbW=W+this.pad*2,vbH=H+this.pad*2;
+    this._vbFull={w:vbW,h:vbH};
+    if(!this._zoomed || !this._view) this._view={x:0,y:0,w:vbW,h:vbH}; else this.clampView(this._view);
     const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
     const grid=doc.meta.gridSpacing||12;
     const sevVar={hard:"var(--hard)",soft:"var(--soft)",shared:"var(--shared)"};
@@ -1167,7 +1296,7 @@ const View = {
     g+=`<g transform="translate(${vbW-18},${vbH-14})" style="pointer-events:none">
       <polygon points="0,-11 3.5,4 0,1 -3.5,4" fill="var(--brass)"/>
       <text x="0" y="-13" fill="var(--brass)" font-size="8" font-family="var(--font-mono)" text-anchor="middle">N</text></g>`;
-    this.el.innerHTML=`<svg viewBox="0 0 ${vbW} ${vbH}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Workshop floor plat">${g}</svg>`;
+    this.el.innerHTML=`<svg viewBox="${this._view.x} ${this._view.y} ${this._view.w} ${this._view.h}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Workshop floor plat">${g}</svg>`;
   },
   // shared feature renderer (columns, doors, windows), used by draw and platSVG
   featureSVG(doc,S,pal,selId){
@@ -1302,12 +1431,71 @@ const View = {
     }
     return {svg:`<svg viewBox="0 0 ${vbW} ${vbH}" preserveAspectRatio="xMidYMid meet">${g}</svg>`, g, vbW, vbH, pad};
   },
+  // bake the plan into a read-only, self-contained HTML viewer (a drawing handoff, no editor)
+  viewerHTML(doc,opt={}){
+    const m=doc.meta||{}; const esc=s=>String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+    const date=m.date||new Date().toISOString().slice(0,10);
+    const scenes=doc.scenarios.map((sc,i)=>{
+      const svg=this.platSVG(doc,sc.id,{palette:"print",notes:opt.notes!==false}).svg;
+      const counts={}; for(const pl of (sc.placements||[])){const def=Model.def(pl.defId); const nm=(def&&def.name)||pl.label||"machine"; counts[nm]=(counts[nm]||0)+1;}
+      const rows=Object.entries(counts).sort((a,b)=>a[0].localeCompare(b[0])).map(([nm,c])=>`<tr><td>${esc(nm)}</td><td>${c}</td></tr>`).join("");
+      return {id:sc.id,name:sc.name,svg,rows,count:(sc.placements||[]).length,first:i===0};
+    });
+    const tabs=scenes.length>1?`<div class="tabs">${scenes.map(s=>`<button data-tab="${s.id}"${s.first?' class="on"':''}>${esc(s.name)}</button>`).join("")}</div>`:"";
+    const panels=scenes.map(s=>`<section class="scene" data-scene="${s.id}"${s.first?'':' style="display:none"'}>
+      <div class="plat">${s.svg}</div>
+      <div class="sched"><h2>Machines <span>${s.count}</span></h2>${s.rows?`<table>${s.rows}</table>`:'<p class="muted">No machines placed.</p>'}</div>
+    </section>`).join("");
+    const legend=`<div class="legend">
+      <span><b style="background:#c23a32"></b>hard clearance</span>
+      <span><b style="background:#a9761a"></b>soft clearance</span>
+      <span><b style="background:#1f7d74"></b>shared / aisle</span>
+      <span><b style="background:#6a4f88"></b>power</span>
+      <span><b style="background:#8a7a52"></b>dust</span></div>`;
+    const css=`:root{--font-mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;--ink:#1a1a1a;--dim:#6a6a6a;--line:#dddad2;--bg:#f4f3ef;--card:#fff}
+      *{box-sizing:border-box} body{margin:0 auto;max-width:1000px;padding:24px;background:var(--bg);color:var(--ink);font-family:"Iowan Old Style",Palatino,Georgia,serif}
+      header{border-bottom:2px solid var(--ink);padding-bottom:10px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px}
+      header .title{font-size:24px;letter-spacing:1px;margin:0} header .sub{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-top:3px}
+      header .meta{font-family:var(--font-mono);font-size:11px;color:var(--dim);text-align:right;line-height:1.6}
+      .tabs{display:flex;gap:6px;margin:14px 0 0;flex-wrap:wrap}
+      .tabs button{font-family:var(--font-mono);font-size:12px;padding:5px 12px;border:1px solid var(--line);background:var(--card);border-radius:6px;cursor:pointer;color:var(--ink)}
+      .tabs button.on{border-color:var(--ink)}
+      .plat{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:14px}
+      .plat svg{width:100%;height:auto;max-height:78vh;display:block}
+      .sched{margin-top:16px} .sched h2{font-size:12px;letter-spacing:1.5px;text-transform:uppercase;border-bottom:1px solid var(--line);padding-bottom:4px;margin:0 0 6px}
+      .sched h2 span{color:var(--dim);font-family:var(--font-mono);font-weight:400;font-size:11px}
+      .sched table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:12.5px;max-width:420px}
+      .sched td{padding:3px 0;border-bottom:1px solid #f0efe9} .sched td:last-child{text-align:right;color:var(--dim)}
+      .legend{display:flex;gap:14px;flex-wrap:wrap;font-family:var(--font-mono);font-size:11px;color:var(--dim);margin-top:14px}
+      .legend b{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
+      .muted{color:var(--dim);font-family:var(--font-mono);font-size:12px}
+      footer{margin-top:22px;border-top:1px solid var(--line);padding-top:8px;font-family:var(--font-mono);font-size:10px;color:var(--dim);line-height:1.6}`;
+    const js=`(function(){var t=document.querySelectorAll('[data-tab]'),s=document.querySelectorAll('[data-scene]');
+      for(var i=0;i<t.length;i++){t[i].onclick=function(){var id=this.getAttribute('data-tab');
+        for(var j=0;j<t.length;j++)t[j].className=t[j].getAttribute('data-tab')===id?'on':'';
+        for(var k=0;k<s.length;k++)s[k].style.display=s[k].getAttribute('data-scene')===id?'':'none';};}})();`;
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">`
+      +`<title>${esc(m.title||"BAYPLAN")} \u00b7 plat</title><style>${css}</style></head><body>`
+      +`<header><div><h1 class="title">${esc((m.title||"Untitled").toUpperCase())}</h1><div class="sub">${esc(doc.facility.name||"Floor Plan")} \u00b7 Plat</div></div>`
+      +`<div class="meta">${esc(date)}<br>REV ${esc(m.revision||"A")}${m.author?"<br>"+esc(m.author):""}<br>${m.units==="metric"?"METRIC":"IMPERIAL"}</div></header>`
+      +tabs+panels+legend
+      +`<footer>Drawn with BAYPLAN (FI-075), Green Shoe Garage. Read-only plat: a drawing for reference, not for construction without field verification and code review.</footer>`
+      +`<script>${js}<\/script></body></html>`;
+  },
   bindPointer(){
     const host=this.el; if(!host) return;
-    let drag=null;
+    let drag=null; const pointers=new Map(); let pinch=null;
     host.addEventListener("pointerdown",e=>{
       if(!this.el.querySelector("svg")) return;
       if(e.button!=null && e.button!==0) return; // primary button / touch only
+      pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(pointers.size>=2){ e.preventDefault();
+        const pts=[...pointers.values()];
+        pinch={dist:Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)||1,
+          mid:{x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2},
+          view:{...(this._view||{x:0,y:0,w:this._vbFull.w,h:this._vbFull.h})}};
+        if(drag){try{host.releasePointerCapture(e.pointerId);}catch(_){} drag=null; History.dragging=false;}
+        return; }
       e.preventDefault();
       const w=this.screenToWorld(e.clientX,e.clientY);
       const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
@@ -1400,6 +1588,17 @@ const View = {
       } else UI.select(null);
     });
     host.addEventListener("pointermove",e=>{
+      if(pointers.has(e.pointerId)) pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+      if(pinch && pointers.size>=2){ e.preventDefault();
+        const pts=[...pointers.values()];
+        const dist=Math.hypot(pts[0].x-pts[1].x,pts[0].y-pts[1].y)||1;
+        const mid={x:(pts[0].x+pts[1].x)/2,y:(pts[0].y+pts[1].y)/2};
+        const svg=this.el.querySelector("svg"); if(!svg)return; const rect=svg.getBoundingClientRect();
+        const at=this.clientToV(pinch.mid.x,pinch.mid.y,pinch.view,rect);
+        const v={...pinch.view}; v.w=pinch.view.w*(pinch.dist/dist); this.clampView(v);
+        const s=Math.min(rect.width/v.w,rect.height/v.h)||1; const ox=(rect.width-v.w*s)/2, oy=(rect.height-v.h*s)/2;
+        v.x=at[0]-(mid.x-rect.left-ox)/s; v.y=at[1]-(mid.y-rect.top-oy)/s; this.clampView(v);
+        this._view=v; this._zoomed=true; this.applyViewBox(); return; }
       if(UI.mode==="dimension" && UI.dimDraft && !drag){const p=this.screenToWorld(e.clientX,e.clientY);
         UI.dimHover=e.altKey?[p[0],p[1]]:[Math.round(p[0]),Math.round(p[1])]; this.draw(); return;}
       if(!drag)return;
@@ -1444,10 +1643,13 @@ const View = {
       if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
       pl.position=[nx,ny]; this.refresh();
     });
-    const end=e=>{ if(drag){try{host.releasePointerCapture(e.pointerId);}catch(_){}}
+    const end=e=>{ pointers.delete(e.pointerId); if(pointers.size<2)pinch=null;
+      if(drag){try{host.releasePointerCapture(e.pointerId);}catch(_){}}
       drag=null; if(History.dragging){History.dragging=false; History.record(UI.doc);} };
     host.addEventListener("pointerup",end);
     host.addEventListener("pointercancel",end);
+    host.addEventListener("wheel",e=>{ if(!this.el.querySelector("svg"))return; e.preventDefault();
+      this.zoomAt(e.clientX,e.clientY, e.deltaY<0?0.85:1.18); },{passive:false});
   }
 };
 
@@ -1455,12 +1657,13 @@ const View = {
 const UI = {
   doc:null, selectedId:null, mode:"select", activeFlowId:null, selectedFlowId:null, selectedNodeId:null,
   selectedVertex:null, selectedFeatureId:null, draftWalls:null, selectedRunId:null, selectedAnnotationId:null, selectedDimensionId:null, dimDraft:null, dimHover:null, compareA:null, compareB:null, measurePts:null,
-  vis:{dust:true, electrical:true, air:true}, showNotes:true, lightHeight:108,
+  vis:{dust:true, electrical:true, air:true}, showNotes:true, lightHeight:108, materialW:48,
   boot(){ if(location.hash==="#test"){Tests.run();return;}
     History.reset();
     History.onRecord=()=>this.scheduleAutosave();
     const restored=this.autosaveLoad();
     this.doc=restored||Model.demo();
+    Model._doc=this.doc;
     this.render();
     const ok=this.storeAvailable()&&this.autosaveSave();
     this.setSaveState(ok?"saved":"off");},
@@ -1984,6 +2187,138 @@ const UI = {
     </div>`;
     window.print();
   },
+  circWidthColor(w){ return w>=48?"#2f8f5b" : w>=36?"#8a9a2e" : w>=24?"#b8763a" : "#c0392b"; },
+  circulationSVG(cov){const pad=12; const W=(cov.maxX-cov.minX)+pad*2, Hd=(cov.maxY-cov.minY)+pad*2;
+    const S=(x,y)=>[(x-cov.minX)+pad,(cov.maxY-y)+pad]; let g="";
+    for(const c of cov.cells){ if(c.blocked)continue; const s=S(c.px-cov.cell/2,c.py+cov.cell/2);
+      g+=`<rect x="${s[0].toFixed(1)}" y="${s[1].toFixed(1)}" width="${(cov.cell+0.5).toFixed(1)}" height="${(cov.cell+0.5).toFixed(1)}" fill="${this.circWidthColor(c.widthIn)}" fill-opacity="${c.reachP?0.7:0.18}"/>`;}
+    const bpts=this.doc.facility.boundary.vertices.map(v=>{const s=S(v[0],v[1]);return s[0].toFixed(1)+","+s[1].toFixed(1);}).join(" ");
+    g+=`<polygon points="${bpts}" fill="none" stroke="#e8e8e8" stroke-width="1.5"/>`;
+    const sc=Services.scenario(this.doc); const unreach=new Set(cov.machines.filter(m=>!m.person).map(m=>m.id));
+    for(const pl of sc.placements){const def=Model.def(pl.defId); if(!def)continue; const bad=unreach.has(pl.id);
+      const fp=G.footprintWorldPoly(def,pl).map(p=>{const s=S(p[0],p[1]);return s[0].toFixed(1)+","+s[1].toFixed(1);}).join(" ");
+      g+=`<polygon points="${fp}" fill="${bad?'rgba(192,57,43,0.30)':'rgba(255,255,255,0.06)'}" stroke="${bad?'#e0574f':'rgba(255,255,255,0.4)'}" stroke-width="${bad?1.6:0.8}"/>`;
+      const c=S(pl.position[0],pl.position[1]); g+=`<text x="${c[0].toFixed(1)}" y="${c[1].toFixed(1)}" fill="rgba(255,255,255,0.7)" font-size="7" font-family="ui-monospace,monospace" text-anchor="middle">${(pl.label||def.name).replace(/</g,'&lt;')}</text>`;}
+    for(const dp of cov.doorPts){const s=S(dp[0],dp[1]); g+=`<circle cx="${s[0].toFixed(1)}" cy="${s[1].toFixed(1)}" r="4" fill="#2f8f5b" stroke="#fff" stroke-width="1"/>`;}
+    return `<svg viewBox="0 0 ${W.toFixed(1)} ${Hd.toFixed(1)}" preserveAspectRatio="xMidYMid meet">${g}</svg>`;
+  },
+  showCirculation(){
+    const cov=Services.circulation(this.doc,{materialW:this.materialW||48});
+    const unreached=cov.machines.filter(m=>!m.person).length;
+    const noMat=cov.machines.filter(m=>m.person&&!m.material).length;
+    const egress=!cov.hasDoor?`<span style="color:var(--soft)">no door placed; add a door to check egress</span>`
+      : unreached?`<span style="color:var(--hard)">${unreached} machine${unreached!==1?'s have':' has'} no ${cov.personW}in path to a door</span>`
+      : `<span style="color:var(--shared)">every machine has a ${cov.personW}in path from a door</span>`;
+    const mw=View.uSize(this.materialW||48);
+    const legend=`<div style="display:flex;align-items:center;gap:10px;margin-top:8px;font-family:var(--font-mono);font-size:10px;color:var(--ink-dim);flex-wrap:wrap">
+      <span><span style="color:${this.circWidthColor(12)}">\u25a0</span> &lt;24in</span>
+      <span><span style="color:${this.circWidthColor(30)}">\u25a0</span> 24\u201336</span>
+      <span><span style="color:${this.circWidthColor(40)}">\u25a0</span> 36\u201348</span>
+      <span><span style="color:${this.circWidthColor(60)}">\u25a0</span> \u226548in</span>
+      <span><span style="color:#2f8f5b">\u25cf</span> door</span></div>`;
+    let inner;
+    if(!cov.cells){ inner=`<p class="empty" style="margin-top:14px">Draw a room first.</p>`; }
+    else { inner=`<div style="background:#12161f;border-radius:8px;padding:6px;margin-top:10px;max-height:54vh;overflow:hidden">${this.circulationSVG(cov)}</div>${legend}
+        <div style="margin-top:12px; font-family:var(--font-mono); font-size:12.5px">
+          <div>Egress: ${egress}</div>
+          <div style="margin-top:3px">Aisle serving the shop: <b>${cov.aisleWidth?cov.aisleWidth+' in'+(cov.aisleWidth>=72?'+':''):'under '+cov.personW+' in'}</b>${cov.narrowestDoor!=null?` \u00b7 narrowest door ${cov.narrowestDoor} in`:''}</div>
+          ${noMat?`<div style="margin-top:3px; color:var(--soft)">${noMat} machine${noMat!==1?'s':''} reachable on foot but not with a ${cov.materialW}in material path</div>`:''}
+        </div>
+        <div style="margin-top:12px; display:flex; gap:8px; align-items:center; font-family:var(--font-mono); font-size:12px">
+          <span>Material path width</span><button data-mw="-">\u2212</button><span style="width:70px;text-align:center">${mw.v} ${mw.u}</span><button data-mw="+">+</button></div>
+        <div style="margin-top:4px; font-family:var(--font-mono); font-size:9.5px; color:var(--ink-dim)">Grid estimate at a ${cov.personW}in walking width. Green cells are wide, red are tight; a red machine has no clear foot path to a door.</div>
+        <div style="margin-top:12px"><button id="crPrint">Print / PDF</button></div>`;
+    }
+    document.getElementById("app").innerHTML=`<div id="compare">
+      <h1>Circulation &amp; egress</h1>
+      <p style="color:var(--ink-dim); font-size:12.5px; margin:0">How wide the open floor is and whether every machine can be reached from a door, on foot and with a sheet of material.</p>
+      ${inner}
+      <p style="margin-top:16px"><a href="#" onclick="UI.render();return false">\u2190 back to plat</a></p>
+    </div>`;
+    const step=(d)=>{ this.materialW=Math.max(24,Math.min(96,(this.materialW||48)+d*6)); this.showCirculation(); };
+    const dec=document.querySelector('[data-mw="-"]'), inc=document.querySelector('[data-mw="+"]');
+    if(dec)dec.onclick=()=>step(-1); if(inc)inc.onclick=()=>step(1);
+    const cp=document.getElementById("crPrint"); if(cp)cp.onclick=()=>this.printCirculation();
+  },
+  printCirculation(){
+    const cov=Services.circulation(this.doc,{materialW:this.materialW||48});
+    const d=this.doc.meta; if(!d.date)d.date=new Date().toISOString().slice(0,10);
+    const scn=(this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId)||{}).name||"";
+    const styleEl=document.getElementById("printPageStyle")||(()=>{const s=document.createElement("style");s.id="printPageStyle";document.head.appendChild(s);return s;})();
+    styleEl.textContent=`@media print{@page{size:8.5in 11in; margin:0.6in;}
+      #printSheet .tk{color:#141414; font-family:"Iowan Old Style",Palatino,Georgia,serif;}
+      #printSheet .tk-top{display:flex; justify-content:space-between; align-items:flex-end; border-bottom:2px solid #141414; padding-bottom:6px;}
+      #printSheet .tk-title{font-size:20px; letter-spacing:1px; margin:0;} #printSheet .tk-sub{font-size:10px; color:#555; letter-spacing:2px; text-transform:uppercase; margin:2px 0 0;}
+      #printSheet .tk-meta{font-family:ui-monospace,Menlo,monospace; font-size:9.5px; color:#444; text-align:right; line-height:1.5;}
+      #printSheet .lg-map{background:#12161f; border-radius:6px; padding:6px; margin:12px 0; break-inside:avoid;}
+      #printSheet .lg-map svg{width:100%; max-height:5in; display:block;}
+      #printSheet .lg-sum{font-family:ui-monospace,Menlo,monospace; font-size:10.5px; color:#333; line-height:1.6;}
+      #printSheet .tk-foot{margin-top:18px; border-top:1px solid #bbb; padding-top:5px; font-family:ui-monospace,Menlo,monospace; font-size:8.5px; color:#888; letter-spacing:1px; display:flex; justify-content:space-between;} }`;
+    const unreached=cov.machines.filter(m=>!m.person).length;
+    const verdict=!cov.hasDoor?"no door placed; egress not checked":unreached?`${unreached} machine(s) with no ${cov.personW}in path to a door`:`every machine has a ${cov.personW}in path from a door`;
+    document.getElementById("printSheet").innerHTML=`<div class="tk">
+      <div class="tk-top"><div><h1 class="tk-title">${(d.title||'Untitled').toUpperCase()}</h1><p class="tk-sub">Circulation &amp; Egress</p></div>
+        <div class="tk-meta">${scn?scn.toUpperCase()+'<br>':''}${d.date}<br>REV ${d.revision||'A'}</div></div>
+      <div class="lg-map">${this.circulationSVG(cov)}</div>
+      <div class="lg-sum">${verdict}. Aisle serving the shop ${cov.aisleWidth?cov.aisleWidth+' in':'under '+cov.personW+' in'}${cov.narrowestDoor!=null?` \u00b7 narrowest door ${cov.narrowestDoor} in`:''}.<br>Grid estimate at ${cov.personW}in walking / ${cov.materialW}in material width; verify against field conditions and egress code.</div>
+      <div class="tk-foot"><span>BAYPLAN FI-075 \u00b7 GREEN SHOE GARAGE</span><span>planning estimate; not an egress code analysis</span></div>
+    </div>`;
+    window.print();
+  },
+  showMachineBuilder(){
+    const userDefs=Model.userDefs();
+    const fld="font-family:var(--font-mono); font-size:12px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:5px; padding:4px 6px";
+    const row=(label,inner)=>`<div style="display:flex; align-items:center; gap:8px; margin-top:7px"><span style="width:140px; font-family:var(--font-mono); font-size:11.5px; color:var(--ink-dim)">${label}</span><span style="display:flex; gap:6px; align-items:center; flex-wrap:wrap">${inner}</span></div>`;
+    const inp=(id,val,ph,w)=>`<input data-mb="${id}" value="${val!=null?val:''}" placeholder="${ph||''}" style="${fld}; width:${w||64}px">`;
+    const num=(id,val,w)=>`<input data-mb="${id}" type="number" value="${val}" style="${fld}; width:${w||58}px">`;
+    const existing = userDefs.length ? `<div style="margin-top:20px; max-width:460px"><h3 style="margin:0 0 4px">Your machines</h3>
+      ${userDefs.map(m=>{const used=Model.userMachineInUse(this.doc,m.id);
+        return `<div style="display:flex; justify-content:space-between; align-items:center; padding:4px 0; font-family:var(--font-mono); font-size:12px; border-top:1px solid var(--line)">
+          <span>${m.name.replace(/</g,"&lt;")} <span style="color:var(--ink-dim)">${m.category}</span></span>
+          <button data-del="${m.id}" ${used?'disabled title="placed in a scenario; remove it first"':''}>Delete</button></div>`;}).join("")}</div>` : "";
+    document.getElementById("app").innerHTML=`<div id="compare">
+      <h1>Custom machine</h1>
+      <p style="color:var(--ink-dim); font-size:12.5px; margin:0">Define a tool once and it joins the shelf, alongside the built-ins. The footprint is a width by depth rectangle; clearances project off each edge (front is the operator side); dust and air ports sit at the center. Dimensions are in inches.</p>
+      <div class="selpanel" style="margin-top:12px; max-width:460px">
+        ${row("Name", inp("name","","drum sander",200))}
+        ${row("Category", inp("category","","sander",200))}
+        ${row("Width \u00d7 Depth", num("width",24)+`<span style="color:var(--ink-dim)">\u00d7</span>`+num("depth",24)+`<span style="color:var(--ink-dim); font-size:11px">in</span>`)}
+        ${row("Clearance front / back", num("cfront",0)+num("cback",0)+`<span style="color:var(--ink-dim); font-size:11px">in deep</span>`)}
+        ${row("Clearance left / right", num("cleft",0)+num("cright",0)+`<span style="color:var(--ink-dim); font-size:11px">in deep</span>`)}
+        ${row("Clearance type", `<select data-mb="severity" style="${fld}"><option value="soft">soft (working room)</option><option value="hard">hard (keep clear)</option><option value="shared">shared (aisle overlap ok)</option></select>`)}
+        ${row("Power", `<select data-mb="voltage" style="${fld}"><option value="120">120V</option><option value="240">240V</option></select>`+num("amps",0)+`<span style="color:var(--ink-dim); font-size:11px">A (0 = none)</span>`)}
+        ${row("Dust port", `<label style="display:flex; gap:5px; align-items:center; font-family:var(--font-mono); font-size:12px"><input type="checkbox" data-mb="dust"> yes</label> dia ${num("dustDia",4,48)}`)}
+        ${row("Air port", `<label style="display:flex; gap:5px; align-items:center; font-family:var(--font-mono); font-size:12px"><input type="checkbox" data-mb="air"> yes</label> ${num("airCfm",5,48)} CFM`)}
+        ${row("Height / Weight", num("height",36)+`<span style="color:var(--ink-dim); font-size:11px">in</span>`+num("weight",0)+`<span style="color:var(--ink-dim); font-size:11px">lb</span>`)}
+        <div style="margin-top:14px"><button id="mbSave">Save to shelf</button> <span id="mbMsg" style="color:var(--shared); font-family:var(--font-mono); font-size:11px; margin-left:8px"></span></div>
+      </div>
+      ${existing}
+      <p style="margin-top:16px"><a href="#" onclick="UI.render();return false">\u2190 back to plat</a></p>
+    </div>`;
+    const g=id=>{const el=document.querySelector('[data-mb="'+id+'"]'); if(!el)return undefined; return el.type==="checkbox"?el.checked:el.value;};
+    document.getElementById("mbSave").onclick=()=>{
+      const name=(g("name")||"").trim(); const msg=document.getElementById("mbMsg");
+      if(!name){ if(msg){msg.style.color="var(--hard)"; msg.textContent="name required";} return; }
+      const spec={name, category:g("category"), width:+g("width"), depth:+g("depth"),
+        clear:{front:+g("cfront")||0, back:+g("cback")||0, left:+g("cleft")||0, right:+g("cright")||0},
+        severity:g("severity"), voltage:+g("voltage"), amps:+g("amps")||0,
+        dust:g("dust"), dustDia:+g("dustDia")||4, air:g("air"), airCfm:+g("airCfm")||5,
+        height:+g("height")||36, weight:+g("weight")||0};
+      const def=Model.addUserMachine(this.doc,spec);
+      View.conflicts=Trim.compute(this.doc); History.record(this.doc);
+      this.showMachineBuilder();
+      const m2=document.getElementById("mbMsg"); if(m2){m2.style.color="var(--shared)"; m2.textContent=def.name+" added to the shelf";}
+    };
+    for(const b of document.querySelectorAll("[data-del]")) b.onclick=()=>{
+      if(Model.removeUserMachine(this.doc,b.dataset.del)){ History.record(this.doc); this.showMachineBuilder(); }};
+  },
+  publishViewer(){
+    const html=View.viewerHTML(this.doc,{notes:this.showNotes!==false});
+    const blob=new Blob([html],{type:"text/html"}); const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=(this.doc.meta.title||"bayplan").replace(/\s+/g,"-").toLowerCase()+"-plat.html";
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  },
   printSetup(){
     if(!this.printOpts) this.printOpts={paper:"letter",orient:"auto",scale:"fit"};
     const o=this.printOpts;
@@ -2045,6 +2380,7 @@ const UI = {
     window.print();
   },
   render(){
+    Model._doc=this.doc;
     const lib=Model.library();
     const scenarios=this.doc.scenarios; const activeSc=this.doc.activeScenarioId;
     let pl; try{pl=Services.punchList(this.doc);}catch(_){pl={clear:true,errors:0,warnings:0};}
@@ -2062,10 +2398,16 @@ const UI = {
           <button id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo" ${History.canUndo()?'':'disabled'}>Undo</button>
           <button id="redoBtn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" ${History.canRedo()?'':'disabled'}>Redo</button>
           <button id="roomBtn">Room</button>
+          <button id="machineBtn" title="Define a custom machine">+ Machine</button>
           <button id="noteBtn" title="Add a note to the plat">+ Note</button>
           <button id="notesVisBtn" title="Show or hide notes" aria-pressed="${this.showNotes!==false}">${this.showNotes!==false?"\u25c9":"\u25ef"} Notes</button>
           <button id="measureBtn">Measure</button>
           <button id="dimBtn" title="Add a dimension line">+ Dim</button>
+          <span class="seg" role="group" aria-label="Zoom">
+            <button id="zoomOutBtn" title="Zoom out" aria-label="Zoom out">\u2212</button>
+            <button id="fitBtn" title="Fit the whole plat">Fit</button>
+            <button id="zoomInBtn" title="Zoom in" aria-label="Zoom in">+</button>
+          </span>
           <span class="seg" role="group" aria-label="Units">
             <button data-units-btn="imperial" aria-pressed="${this.units()!=='metric'}">in</button>
             <button data-units-btn="metric" aria-pressed="${this.units()==='metric'}">cm</button>
@@ -2076,9 +2418,11 @@ const UI = {
           <button id="panelBtn" title="Panel schedule">Panel</button>
           <button id="lightingBtn" title="Lighting coverage">Lighting</button>
           <button id="checkBtn" title="Readiness punch list" style="color:${readyColor}">${readyBadge}</button>
+          <button id="egressBtn" title="Circulation and egress">Egress</button>
           <button id="newBtn">New</button>
           <button id="importBtn">Import</button>
           <button id="exportBtn">Export</button>
+          <button id="publishBtn" title="Bake a read-only plat to share">Publish</button>
           <span id="saveState" title="Autosave" style="font-family:var(--font-mono); font-size:11px; color:var(--ink-dim); align-self:center; padding:0 4px"></span>
           <span class="seg" role="group" aria-label="Theme">
             <button data-theme-btn="night" aria-pressed="true">Night</button>
@@ -2119,20 +2463,27 @@ const UI = {
     View.scene(this.doc);
     document.getElementById("newBtn").onclick=()=>{this.doc=Model.emptyFacility(); this.selectedId=null; View.scene(this.doc);};
     document.getElementById("exportBtn").onclick=()=>Model.export(this.doc);
+    document.getElementById("publishBtn").onclick=()=>this.publishViewer();
     document.getElementById("dupBtn").onclick=()=>this.dupScenario();
     document.getElementById("undoBtn").onclick=()=>this.undo();
     document.getElementById("redoBtn").onclick=()=>this.redo();
     document.getElementById("roomBtn").onclick=()=>this.enterSounding();
+    document.getElementById("machineBtn").onclick=()=>this.showMachineBuilder();
     document.getElementById("noteBtn").onclick=()=>{this.mode="select"; this.showNotes=true; this.addAnnotation();};
     document.getElementById("notesVisBtn").onclick=()=>this.toggleNotes();
     document.getElementById("measureBtn").onclick=()=>this.enterMeasure();
     document.getElementById("dimBtn").onclick=()=>this.enterDimension();
+    document.getElementById("fitBtn").onclick=()=>View.resetView();
+    const zoomCenter=f=>{const svg=View.el&&View.el.querySelector("svg"); if(!svg)return; const r=svg.getBoundingClientRect(); View.zoomAt(r.left+r.width/2, r.top+r.height/2, f);};
+    document.getElementById("zoomInBtn").onclick=()=>zoomCenter(0.8);
+    document.getElementById("zoomOutBtn").onclick=()=>zoomCenter(1.25);
     document.getElementById("compareBtn").onclick=()=>this.showCompare();
     document.getElementById("printBtn").onclick=()=>this.printSetup();
     document.getElementById("takeoffBtn").onclick=()=>this.showTakeoff();
     document.getElementById("panelBtn").onclick=()=>this.showPanelSchedule();
     document.getElementById("lightingBtn").onclick=()=>this.showLighting();
     document.getElementById("checkBtn").onclick=()=>this.showPunchList();
+    document.getElementById("egressBtn").onclick=()=>this.showCirculation();
     for(const b of document.querySelectorAll("[data-scenario]")) b.onclick=()=>this.switchScenario(b.dataset.scenario);
     document.getElementById("importBtn").onclick=()=>{const inp=document.createElement("input");
       inp.type="file"; inp.accept=".json";
@@ -2951,6 +3302,41 @@ const Tests = {
       this.ok("DIM: the printed plat renders the dimension",/<line /.test(View.platSVG(d,"s1",{palette:"print"}).svg));
       const r=History.restore(History.snapshot(d));
       this.ok("DIM: dimensions survive snapshot/restore",r.scenarios[0].dimensions.length===1);})();
+    // v0.0.29: circulation / egress
+    (()=>{const d=Model.emptyFacility(); Model.setFacilityRect(d,400,300); const fb=G.bounds(d.facility.boundary);
+      d.facility.features.push({id:"dr",kind:"door",position:[(fb.minX+fb.maxX)/2,fb.minY],width:48,swingStart:0,swingSweep:90});
+      d.scenarios[0].placements.push({id:"m",defId:"builtin-drill-press",position:[(fb.minX+fb.maxX)/2,(fb.minY+fb.maxY)/2],rotation:0,mirrored:false});
+      const c=Services.circulation(d,{materialW:48});
+      this.ok("EGRESS: a machine in a clear room is reachable on foot",c.machines[0].person===true);
+      this.ok("EGRESS: a wide clear room reports a wide aisle",c.aisleWidth>=36&&c.findings.length===0);})();
+    (()=>{const d=Model.emptyFacility(); Model.setFacilityRect(d,400,300); const fb=G.bounds(d.facility.boundary);
+      d.scenarios[0].placements.push({id:"m",defId:"builtin-drill-press",position:[(fb.minX+fb.maxX)/2,(fb.minY+fb.maxY)/2],rotation:0,mirrored:false});
+      this.ok("EGRESS: no door yields an egress warning",Services.circulation(d).findings.some(f=>/no door/.test(f.text)));
+      this.ok("EGRESS: circulation findings reach the punch list",Services.punchList(d).items.some(i=>i.group==="Circulation"));})();
+    // v0.0.30: custom machine builder
+    (()=>{const saveDoc=Model._doc; const d=Model.emptyFacility(); Model._doc=d;
+      const def=Model.addUserMachine(d,{name:"Test sander",category:"sander",width:30,depth:20,clear:{front:40,right:12},amps:20,voltage:120,dust:true});
+      this.ok("BUILDER: a custom machine resolves and joins the library",Model.def(def.id)===def && Model.library().some(m=>m.id===def.id));
+      this.ok("BUILDER: footprint and clearances build from width and depth",def.footprint.vertices.length===4 && def.clearances.length===2 && !!def.dustPort && def.provenance.source==="user");
+      d.scenarios[0].placements.push({id:"px",defId:def.id,position:[120,120],rotation:0,mirrored:false});
+      const rt=(()=>{const out=Object.assign({},d);delete out.library;const back=JSON.parse(JSON.stringify(out));return back.userLibrary.length===1;})();
+      this.ok("BUILDER: a placed user machine round-trips and cannot be deleted while in use",rt && Model.removeUserMachine(d,def.id)===false);
+      d.scenarios[0].placements=[]; this.ok("BUILDER: an unused custom machine can be deleted",Model.removeUserMachine(d,def.id)===true && d.userLibrary.length===0);
+      Model._doc=saveDoc;})();
+    // v0.0.31: standalone viewer export
+    (()=>{const d=Model.demo(); d.scenarios[0].annotations=[{id:"a1",position:[60,60],text:"welcome"}];
+      const out=View.viewerHTML(d,{notes:true});
+      this.ok("VIEWER: bakes a self-contained HTML plat with the SVG and no app-only vars",
+        /^<!doctype html>/i.test(out) && out.indexOf("<svg ")>=0 && /--font-mono:/.test(out) && !/var\(--(brass|ground|grid|power|panel|hard|soft|shared|dust|footprint|ink-dim)\)/.test(out));
+      this.ok("VIEWER: lists placed machines, carries no editor controls, and no em dash",
+        /class="sched"/.test(out) && !/addMachine|id="dimBtn"/.test(out) && out.indexOf("\u2014")===-1);})();
+    // v0.0.32: touch pass (zoom window clamp math, DOM-free)
+    (()=>{const save={vbFull:View._vbFull,view:View._view,zoomed:View._zoomed}; View._vbFull={w:1000,h:500};
+      const v=View.clampView({x:-50,y:-50,w:2000,h:1000});
+      this.ok("TOUCH: clampView caps the window to the full plat and keeps it in bounds",v.w===1000&&v.h===500&&v.x===0&&v.y===0);
+      const v2=View.clampView({x:0,y:0,w:10,h:5});
+      this.ok("TOUCH: clampView enforces a minimum zoom and holds aspect",Math.abs(v2.w-1000/14)<1e-6&&Math.abs(v2.h-v2.w*0.5)<1e-6);
+      View._vbFull=save.vbFull; View._view=save.view; View._zoomed=save.zoomed;})();
     // PLAT
     (()=>{const d=Model.emptyFacility();
       d.scenarios[0].placements=[{id:"a",defId:"builtin-drill-press",position:[100,100],rotation:0,mirrored:false}];

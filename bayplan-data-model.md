@@ -28,10 +28,13 @@ BayplanDocument
   schemaVersion     "1.0.0"
   meta              { title, created, modified, author, units:"imperial"|"metric", gridSpacing }  // units is display only; model is inches
   facility          Facility        // the bounded space, shared across scenarios
-  library           MachineDef[]    // definitions (types), not placements
+  library           MachineDef[]    // built-in seed definitions; stripped on save, reattached on load
+  userLibrary       MachineDef[]    // user-authored definitions; a real document field, saved and loaded with the plan
   scenarios         Scenario[]      // current, proposed, etc.
   activeScenarioId
 ```
+
+`library` and `userLibrary` are both definition lists, but only `userLibrary` is persisted: the built-in `library` is the same seed for every plan and is reattached on load, while `userLibrary` travels with the document so a placement referencing a custom machine survives export, import, and autosave. `Model.def(id)` resolves against the seed first, then the user library; `Model.library()` returns the two concatenated, which is why custom machines appear on the shelf. User definition ids begin `user-`; seed ids begin `builtin-`. The custom machine builder authors a MachineDef from simple inputs: a width and depth become a centered rectangular footprint, each nonzero edge depth becomes a rect clearance off that edge (front is the operator side), amps and voltage become the power block (dedicated at 240V or 30A and up), the dust and air toggles become centered ports, two work points land front and back, and provenance is marked `user`.
 
 ### The definition/placement split
 
