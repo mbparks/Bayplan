@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.18 | build-marker: units-wirebends-2026-07-08 -->
+<!-- BAYPLAN FI-075 | v0.0.19 | build-marker: takeoff-2026-07-08 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -137,7 +137,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.18  (metric/imperial toggle + electrical wire bends)
+   BAYPLAN FI-075  v0.0.19  (materials takeoff / shopping list)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -635,6 +635,46 @@ const Services = {
   // manual override: move a run onto a chosen circuit (or a new one)
   assignRunCircuit(doc,runId,circuitId){const sc=this.scenario(doc);
     const r=(sc.utilityRuns||[]).find(x=>x.id===runId); if(r)r.circuitId=circuitId;},
+  // copper conductor gauge (AWG) for a branch breaker, NEC 60/75C copper
+  WIRE_GAUGE:{15:"14",20:"12",30:"10",40:"8",50:"6",60:"4"},
+  gaugeForBreaker(a){const t=this.WIRE_GAUGE; if(t[a])return t[a];
+    const ks=Object.keys(t).map(Number).sort((x,y)=>x-y); let g=t[ks[ks.length-1]];
+    for(const k of ks){ if(a<=k){g=t[k]; break;} } return g;},
+  // materials takeoff (shopping list) for the active scenario
+  takeoff(doc){
+    const sc=this.scenario(doc); const runs=sc.utilityRuns||[]; const nodes=sc.utilityNodes||[];
+    const elbowsOf=poly=>Math.max(0,poly.length-2);
+    // outlets by type
+    const outMap={}; for(const n of nodes.filter(n=>n.kind==="receptacle")){const k=(n.spec.voltage||120)+"|"+(n.spec.amps||20); outMap[k]=(outMap[k]||0)+1;}
+    const outlets=Object.entries(outMap).map(([k,count])=>{const p=k.split("|").map(Number); return {voltage:p[0],amps:p[1],count};})
+      .sort((a,b)=>a.voltage-b.voltage||a.amps-b.amps);
+    // panel circuit lookup
+    const panels=nodes.filter(n=>n.kind==="panel");
+    const ckById={}; for(const p of panels) for(const c of (p.spec.circuits||[])) ckById[c.id]=c;
+    // copper cable by gauge (run feet, with a slack allowance)
+    const wireMap={}; const elec=runs.filter(r=>r.system==="electrical");
+    for(const r of elec){const ft=this.polylineLenFt(this.routePolyline(doc,r));
+      const c=ckById[r.circuitId]; const amps=c?c.amps:(r.spec.amps||20);
+      const g=this.gaugeForBreaker(amps); wireMap[g]=(wireMap[g]||0)+ft;}
+    const wireByGauge=Object.entries(wireMap).map(([gauge,ft])=>({gauge,ft,buyFt:Math.ceil(ft*1.15/5)*5}))
+      .sort((a,b)=>a.gauge-b.gauge); // finer (smaller wire, higher AWG) first
+    // breakers by size/pole
+    const brMap={}; for(const p of panels) for(const c of (p.spec.circuits||[])){const k=c.amps+"|"+(c.voltage>=240?"2":"1"); brMap[k]=(brMap[k]||0)+1;}
+    const breakers=Object.entries(brMap).map(([k,count])=>{const p=k.split("|"); return {amps:+p[0],pole:p[1]==="2"?"double":"single",count};})
+      .sort((a,b)=>a.amps-b.amps);
+    // duct by diameter, with elbow and blast-gate counts
+    const dMap={}; for(const r of runs.filter(r=>r.system==="dust")){const poly=this.routePolyline(doc,r); const dia=r.spec.diameter||4;
+      if(!dMap[dia])dMap[dia]={diameter:dia,ft:0,elbows:0,gates:0};
+      dMap[dia].ft+=this.polylineLenFt(poly); dMap[dia].elbows+=elbowsOf(poly); dMap[dia].gates+=1;}
+    const duct=Object.values(dMap).sort((a,b)=>a.diameter-b.diameter);
+    // compressed air line
+    const airRuns=runs.filter(r=>r.system==="air"); let airFt=0, airElbows=0;
+    for(const r of airRuns){const poly=this.routePolyline(doc,r); airFt+=this.polylineLenFt(poly); airElbows+=elbowsOf(poly);}
+    // fixed equipment
+    const equipment=[["Load center / panel","panel"],["Dust collector","dust_collector"],["Air compressor","compressor"]]
+      .map(pair=>({item:pair[0],count:nodes.filter(n=>n.kind===pair[1]).length})).filter(e=>e.count>0);
+    return {outlets,wireByGauge,breakers,duct,airFt,airRuns:airRuns.length,airElbows,equipment};
+  },
   compute(doc){
     const sc=this.scenario(doc); const recs=[]; const runs=sc.utilityRuns||[];
     // dust
@@ -1366,6 +1406,47 @@ const UI = {
       document.getElementById("cmpB").onchange=(e)=>this.setCompare("b",e.target.value);
     }
   },
+  takeoffText(t,metric){
+    const L=ft=> metric? (ft*0.3048).toFixed(1)+" m" : Math.ceil(ft)+" ft";
+    const lines=[]; const title=(this.doc.meta.title||"Untitled").toUpperCase();
+    lines.push("MATERIALS TAKEOFF \u2014 "+title); lines.push("BAYPLAN FI-075 \u00b7 "+(this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId)||{}).name); lines.push("");
+    if(t.outlets.length){lines.push("OUTLETS"); for(const o of t.outlets) lines.push(`  ${o.voltage}V ${o.amps}A x ${o.count}`); lines.push("");}
+    if(t.breakers.length){lines.push("BREAKERS"); for(const b of t.breakers) lines.push(`  ${b.amps}A ${b.pole}-pole x ${b.count}`); lines.push("");}
+    if(t.wireByGauge.length){lines.push("COPPER CABLE (branch runs, +15% slack)"); for(const w of t.wireByGauge) lines.push(`  ${w.gauge} AWG \u2014 ${L(w.ft)} run, buy ${L(w.buyFt)}`); lines.push("");}
+    if(t.duct.length){lines.push("DUST DUCT"); for(const d of t.duct) lines.push(`  ${d.diameter}in \u2014 ${L(d.ft)}, ${d.elbows} elbow(s), ${d.gates} blast gate(s)`); lines.push("");}
+    if(t.airRuns){lines.push("COMPRESSED AIR"); lines.push(`  air line \u2014 ${L(t.airFt)}, ${t.airElbows} elbow(s)`); lines.push("");}
+    if(t.equipment.length){lines.push("EQUIPMENT"); for(const e of t.equipment) lines.push(`  ${e.item} x ${e.count}`); lines.push("");}
+    return lines.join("\n").trim();
+  },
+  showTakeoff(){
+    const t=Services.takeoff(this.doc); const metric=this.units()==="metric";
+    const L=ft=> metric? (ft*0.3048).toFixed(1)+" m" : Math.ceil(ft)+" ft";
+    const sec=(title,rows)=> rows.length?`<div style="margin-top:14px"><h3 style="margin:0 0 4px">${title}</h3>
+      <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:12.5px">${rows.map(r=>`<tr><td style="padding:2px 0">${r[0]}</td><td style="text-align:right;color:var(--ink-dim)">${r[1]}</td></tr>`).join("")}</table></div>`:"";
+    const anything=t.outlets.length||t.wireByGauge.length||t.breakers.length||t.duct.length||t.airRuns||t.equipment.length;
+    const body = anything? [
+      sec("Outlets", t.outlets.map(o=>[`${o.voltage}V ${o.amps}A`, `\u00d7 ${o.count}`])),
+      sec("Breakers", t.breakers.map(b=>[`${b.amps}A ${b.pole}-pole`, `\u00d7 ${b.count}`])),
+      sec("Copper cable (branch runs, +15% slack)", t.wireByGauge.map(w=>[`${w.gauge} AWG`, `${L(w.ft)} run \u00b7 buy ${L(w.buyFt)}`])),
+      sec("Dust duct", t.duct.map(d=>[`${d.diameter}in duct`, `${L(d.ft)} \u00b7 ${d.elbows} elbow${d.elbows!==1?'s':''} \u00b7 ${d.gates} gate${d.gates!==1?'s':''}`])),
+      sec("Compressed air", t.airRuns?[[`air line`, `${L(t.airFt)} \u00b7 ${t.airElbows} elbow${t.airElbows!==1?'s':''}`]]:[]),
+      sec("Equipment", t.equipment.map(e=>[e.item, `\u00d7 ${e.count}`])),
+    ].join("") : `<p class="empty" style="margin-top:14px">Nothing to tally yet. Open Utilities, place your panel, outlets, collector, and compressor, then Wire all, and the takeoff fills in.</p>`;
+    const text=this.takeoffText(t,metric);
+    document.getElementById("app").innerHTML=`<div id="compare">
+      <h1>Materials takeoff</h1>
+      <p style="color:var(--ink-dim); font-size:12.5px; margin:0">Quantities from the active scenario's utilities. Lengths follow your unit setting; cable includes a fifteen percent slack allowance for terminations.</p>
+      ${body}
+      ${anything?`<div style="margin-top:16px"><button id="toCopy">Copy list</button> <span id="toCopyMsg" style="color:var(--ink-dim); font-size:11.5px; margin-left:8px"></span></div>
+      <textarea id="toText" readonly style="width:100%; height:150px; margin-top:8px; font-family:var(--font-mono); font-size:11.5px; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:8px">${text.replace(/</g,"&lt;")}</textarea>`:``}
+      <p style="margin-top:16px"><a href="#" onclick="UI.render();return false">\u2190 back to plat</a></p>
+    </div>`;
+    const cp=document.getElementById("toCopy");
+    if(cp)cp.onclick=()=>{const ta=document.getElementById("toText"); const msg=document.getElementById("toCopyMsg");
+      const done=()=>{if(msg)msg.textContent="copied";};
+      try{navigator.clipboard.writeText(text).then(done,()=>{ta.focus();ta.select();done();});}
+      catch(_){ta.focus();ta.select(); try{document.execCommand("copy");}catch(e){} done();}};
+  },
   printSetup(){
     if(!this.printOpts) this.printOpts={paper:"letter",orient:"auto",scale:"fit"};
     const o=this.printOpts;
@@ -1448,6 +1529,7 @@ const UI = {
           </span>
           <button id="compareBtn" ${scenarios.length<2?'disabled':''}>Compare</button>
           <button id="printBtn">Print</button>
+          <button id="takeoffBtn" title="Materials shopping list">Takeoff</button>
           <button id="newBtn">New</button>
           <button id="importBtn">Import</button>
           <button id="exportBtn">Export</button>
@@ -1497,6 +1579,7 @@ const UI = {
     document.getElementById("measureBtn").onclick=()=>this.enterMeasure();
     document.getElementById("compareBtn").onclick=()=>this.showCompare();
     document.getElementById("printBtn").onclick=()=>this.printSetup();
+    document.getElementById("takeoffBtn").onclick=()=>this.showTakeoff();
     for(const b of document.querySelectorAll("[data-scenario]")) b.onclick=()=>this.switchScenario(b.dataset.scenario);
     document.getElementById("importBtn").onclick=()=>{const inp=document.createElement("input");
       inp.type="file"; inp.accept=".json";
@@ -2142,6 +2225,17 @@ const Tests = {
       this.ok("WIRES: an electrical run honors manual bends",Services.routePolyline(d,run).length===4);
       const rn={id:"r2",system:"electrical",fromNode:"p",toNodeId:"p",spec:{voltage:120,amps:20,receptacle:true}};
       this.ok("WIRES: a straight electrical run is two points",Services.routePolyline(d,{id:"r3",system:"electrical",fromNode:"p",toPlacementId:"a",spec:{voltage:240,amps:15}}).length===2);})();
+    // v0.0.19: materials takeoff
+    this.ok("TAKEOFF: conductor gauge follows the breaker",Services.gaugeForBreaker(20)==="12"&&Services.gaugeForBreaker(50)==="6"&&Services.gaugeForBreaker(15)==="14");
+    (()=>{const d=Model.demo();
+      Model.addNode(d,"panel"); Model.addNode(d,"dust_collector"); Model.addNode(d,"compressor");
+      const o=Model.addNode(d,"receptacle"); o.spec={voltage:120,amps:20};
+      const o2=Model.addNode(d,"receptacle"); o2.spec={voltage:240,amps:50};
+      Services.wireAll(d); const t=Services.takeoff(d);
+      this.ok("TAKEOFF: outlets tally by type",t.outlets.some(x=>x.voltage===240&&x.amps===50&&x.count===1));
+      this.ok("TAKEOFF: copper cable grouped by gauge with slack",t.wireByGauge.length>0&&t.wireByGauge.every(w=>w.buyFt>=w.ft));
+      this.ok("TAKEOFF: duct tallied with blast gates",t.duct.length>0&&t.duct.every(x=>x.gates>=1));
+      this.ok("TAKEOFF: equipment counted",t.equipment.find(e=>/compressor/i.test(e.item)).count===1);})();
     // PLAT
     (()=>{const d=Model.emptyFacility();
       d.scenarios[0].placements=[{id:"a",defId:"builtin-drill-press",position:[100,100],rotation:0,mirrored:false}];
