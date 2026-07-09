@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.7 | build-marker: sounding-2026-07-08 -->
+<!-- BAYPLAN FI-075 | v0.0.8 | build-marker: undo-2026-07-08 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -137,7 +137,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.7  (SOUNDING: walls + features)
+   BAYPLAN FI-075  v0.0.8  (undo/redo history)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -569,12 +569,32 @@ const Compare = {
   }
 };
 
+/* ---- history: snapshot undo/redo ---- */
+const History = {
+  states:[], idx:-1, MAX:80, suspend:false, dragging:false,
+  snapshot(doc){const c=Object.assign({},doc); delete c.library; return JSON.stringify(c);},
+  restore(s){const d=JSON.parse(s); d.library=SEED.library; return d;},
+  reset(){this.states=[]; this.idx=-1;},
+  record(doc){
+    if(this.suspend||this.dragging) return;
+    const s=this.snapshot(doc);
+    if(this.idx>=0 && this.states[this.idx]===s) return;      // no-op dedupe
+    this.states=this.states.slice(0,this.idx+1);              // drop any redo tail
+    this.states.push(s); this.idx=this.states.length-1;
+    if(this.states.length>this.MAX){this.states.shift(); this.idx--;}
+  },
+  canUndo(){return this.idx>0;},
+  canRedo(){return this.idx<this.states.length-1;},
+  undo(){if(this.idx<=0)return null; this.idx--; return this.restore(this.states[this.idx]);},
+  redo(){if(this.idx>=this.states.length-1)return null; this.idx++; return this.restore(this.states[this.idx]);}
+};
+
 /* ---- render + interaction ---- */
 const View = {
   el:null,doc:null,pad:24,_b:null,_H:0,conflicts:null,
   mount(el){this.el=el;},
-  scene(doc){this.doc=doc; this.conflicts=Trim.compute(doc); this.draw(); UI.syncPanels();},
-  refresh(){this.conflicts=Trim.compute(this.doc); this.draw(); UI.syncPanels();},
+  scene(doc){this.doc=doc; this.conflicts=Trim.compute(doc); this.draw(); UI.syncPanels(); History.record(doc);},
+  refresh(){this.conflicts=Trim.compute(this.doc); this.draw(); UI.syncPanels(); History.record(this.doc);},
   toScreen(pt){return[pt[0]-this._b.minX+this.pad, this._H-(pt[1]-this._b.minY)+this.pad];},
   screenToWorld(clientX,clientY){
     const svg=this.el.querySelector("svg"); const m=svg.getScreenCTM().inverse();
@@ -799,7 +819,7 @@ const View = {
           if(d<bd){bd=d;hn=n;}}
         if(hn){ UI.selectNode(hn.id);
           drag={node:hn.id,offX:w[0]-hn.position[0],offY:w[1]-hn.position[1]};
-          svg.setPointerCapture(e.pointerId);
+          History.dragging=true; svg.setPointerCapture(e.pointerId);
         } else UI.selectNode(null);
         return;
       }
@@ -809,7 +829,7 @@ const View = {
         let vi=-1,bd=12;
         V.forEach((v,i)=>{const d=Math.hypot(v[0]-w[0],v[1]-w[1]); if(d<bd){bd=d;vi=i;}});
         if(vi>=0){ UI.selectVertex(vi);
-          drag={vertex:vi,offX:w[0]-V[vi][0],offY:w[1]-V[vi][1]}; svg.setPointerCapture(e.pointerId); return; }
+          drag={vertex:vi,offX:w[0]-V[vi][0],offY:w[1]-V[vi][1]}; History.dragging=true; svg.setPointerCapture(e.pointerId); return; }
         // then features
         let hf=null;
         for(let i=this.doc.facility.features.length-1;i>=0;i--){const f=this.doc.facility.features[i];
@@ -817,7 +837,7 @@ const View = {
           const inCol=f.kind==="column"&&G.pointInPolygon(w,Feat.columnPoly(f));
           if(near||inCol){hf=f;break;}}
         if(hf){ UI.selectFeature(hf.id);
-          drag={feature:hf.id,offX:w[0]-hf.position[0],offY:w[1]-hf.position[1]}; svg.setPointerCapture(e.pointerId);
+          drag={feature:hf.id,offX:w[0]-hf.position[0],offY:w[1]-hf.position[1]}; History.dragging=true; svg.setPointerCapture(e.pointerId);
         } else UI.selectFeature(null);
         return;
       }
@@ -827,7 +847,7 @@ const View = {
       if(UI.mode==="route"){ if(hit) UI.addWaypoint(hit.id,Flow.nearestPort(this.doc,hit,w)); return; }
       if(hit){ UI.select(hit.id);
         if(!hit.locked){ drag={id:hit.id,offX:w[0]-hit.position[0],offY:w[1]-hit.position[1]};
-          svg.setPointerCapture(e.pointerId); }
+          History.dragging=true; svg.setPointerCapture(e.pointerId); }
       } else UI.select(null);
     });
     svg.addEventListener("pointermove",e=>{
@@ -851,7 +871,8 @@ const View = {
       if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
       pl.position=[nx,ny]; this.refresh();
     });
-    const end=e=>{ if(drag){try{svg.releasePointerCapture(e.pointerId);}catch(_){}} drag=null; };
+    const end=e=>{ if(drag){try{svg.releasePointerCapture(e.pointerId);}catch(_){}}
+      drag=null; if(History.dragging){History.dragging=false; History.record(UI.doc);} };
     svg.addEventListener("pointerup",end);
     svg.addEventListener("pointercancel",end);
   }
@@ -862,7 +883,13 @@ const UI = {
   doc:null, selectedId:null, mode:"select", activeFlowId:null, selectedFlowId:null, selectedNodeId:null,
   selectedVertex:null, selectedFeatureId:null,
   boot(){ if(location.hash==="#test"){Tests.run();return;}
-    this.doc=Model.demo(); this.render();},
+    History.reset(); this.doc=Model.demo(); this.render();},
+  undo(){const d=History.undo(); if(!d)return; History.suspend=true; this.doc=d;
+    this.selectedId=this.selectedNodeId=this.selectedFeatureId=null; this.selectedVertex=null; this.selectedFlowId=null;
+    this.render(); History.suspend=false;},
+  redo(){const d=History.redo(); if(!d)return; History.suspend=true; this.doc=d;
+    this.selectedId=this.selectedNodeId=this.selectedFeatureId=null; this.selectedVertex=null; this.selectedFlowId=null;
+    this.render(); History.suspend=false;},
   enterSounding(){this.mode="sounding"; this.selectedId=null; this.selectedFlowId=null; this.activeFlowId=null;
     this.selectedNodeId=null; View.refresh();},
   exitSounding(){this.mode="select"; this.selectedVertex=null; this.selectedFeatureId=null; View.refresh();},
@@ -922,7 +949,7 @@ const UI = {
   dupScenario(){Model.duplicateScenario(this.doc); this.selectedId=null; this.selectedNodeId=null;
     this.mode="select"; this.render();},
   switchScenario(id){Model.setActiveScenario(this.doc,id); this.selectedId=null; this.selectedNodeId=null;
-    this.mode="select"; this.render();},
+    this.mode="select"; History.suspend=true; this.render(); History.suspend=false;},
   showCompare(){
     if(this.doc.scenarios.length<2){this.dupScenario(); return;}
     const ids=this.doc.scenarios.map(s=>s.id);
@@ -978,6 +1005,8 @@ const UI = {
             ${scenarios.map(s=>`<button data-scenario="${s.id}" aria-pressed="${s.id===activeSc}">${s.name}</button>`).join("")}
           </span>
           <button id="dupBtn" title="Duplicate active scenario">+ Scenario</button>
+          <button id="undoBtn" title="Undo (Ctrl+Z)" aria-label="Undo" ${History.canUndo()?'':'disabled'}>Undo</button>
+          <button id="redoBtn" title="Redo (Ctrl+Shift+Z)" aria-label="Redo" ${History.canRedo()?'':'disabled'}>Redo</button>
           <button id="roomBtn">Room</button>
           <button id="compareBtn" ${scenarios.length<2?'disabled':''}>Compare</button>
           <button id="printBtn">Print</button>
@@ -1023,6 +1052,8 @@ const UI = {
     document.getElementById("newBtn").onclick=()=>{this.doc=Model.emptyFacility(); this.selectedId=null; View.scene(this.doc);};
     document.getElementById("exportBtn").onclick=()=>Model.export(this.doc);
     document.getElementById("dupBtn").onclick=()=>this.dupScenario();
+    document.getElementById("undoBtn").onclick=()=>this.undo();
+    document.getElementById("redoBtn").onclick=()=>this.redo();
     document.getElementById("roomBtn").onclick=()=>this.enterSounding();
     document.getElementById("compareBtn").onclick=()=>this.showCompare();
     document.getElementById("printBtn").onclick=()=>this.printPlat();
@@ -1038,6 +1069,9 @@ const UI = {
   bindKeys(){
     document.onkeydown=e=>{
       if(e.target.tagName==="INPUT")return;
+      if((e.ctrlKey||e.metaKey)&&(e.key==="z"||e.key==="Z")){
+        if(e.shiftKey)this.redo(); else this.undo(); e.preventDefault(); return;}
+      if((e.ctrlKey||e.metaKey)&&(e.key==="y"||e.key==="Y")){this.redo(); e.preventDefault(); return;}
       if(this.mode==="sounding"){
         if(e.key==="Escape")this.exitSounding();
         else if((e.key==="r"||e.key==="R")&&this.selectedFeatureId){this.rotateFeature(e.shiftKey?-15:15);e.preventDefault();}
@@ -1245,6 +1279,9 @@ const UI = {
       : this.mode==="sounding"
       ? "room: drag corners and features \u00b7 add via the panel \u00b7 Esc to finish"
       : "drag to move \u00b7 R rotate \u00b7 M mirror \u00b7 Del remove";
+    const ub=document.getElementById("undoBtn"), rdb=document.getElementById("redoBtn");
+    if(ub)ub.disabled=!History.canUndo();
+    if(rdb)rdb.disabled=!History.canRedo();
   }
 };
 
@@ -1449,13 +1486,39 @@ const Tests = {
       d.scenarios[0].placements=[{id:"a",defId:"builtin-table-saw-cabinet",position:[150,120],rotation:0,mirrored:false}];
       Model.addFeature(d,"window"); d.facility.features[0].position=[150,120];
       this.ok("SOUNDING: a window does not constrain placement",Trim.compute(d).errors===0&&Trim.compute(d).warnings===0);})();
+    // HISTORY (undo/redo)
+    (()=>{const h=History; const save={states:h.states,idx:h.idx,suspend:h.suspend,dragging:h.dragging};
+      h.reset(); h.suspend=false; h.dragging=false;
+      const d=Model.emptyFacility();
+      h.record(d); // baseline
+      this.ok("HISTORY: baseline recorded, nothing to undo yet",!h.canUndo());
+      d.scenarios[0].placements.push({id:"a",defId:"builtin-drill-press",position:[100,100],rotation:0,mirrored:false});
+      h.record(d);
+      this.ok("HISTORY: an edit becomes undoable",h.canUndo());
+      const back=h.undo();
+      this.ok("HISTORY: undo restores the prior state",back.scenarios[0].placements.length===0);
+      this.ok("HISTORY: after undo, redo is available",h.canRedo());
+      const fwd=h.redo();
+      this.ok("HISTORY: redo re-applies the edit",fwd.scenarios[0].placements.length===1);
+      // no-op dedupe: recording the same state twice does not add a step
+      const before=h.states.length; h.record(fwd); h.record(fwd);
+      this.ok("HISTORY: identical states are deduped",h.states.length===before);
+      // dragging suspends recording
+      h.dragging=true; const n=h.states.length;
+      const d2=JSON.parse(JSON.stringify(fwd)); d2.scenarios[0].placements[0].position=[200,200]; h.record(d2);
+      this.ok("HISTORY: no snapshot recorded mid-drag",h.states.length===n);
+      h.dragging=false;
+      // library is stripped from snapshots
+      this.ok("HISTORY: snapshots omit the bundled library",h.snapshot(fwd).indexOf('builtin-table-saw')===-1);
+      this.ok("HISTORY: restore re-attaches the library",h.restore(h.snapshot(fwd)).library===SEED.library);
+      Object.assign(h,save);})();
     this.paint();
   },
   paint(){
     const pass=this.results.filter(r=>r.pass).length,total=this.results.length;
     const rows=this.results.map(r=>`<tr><td class="${r.pass?'t-pass':'t-fail'}">${r.pass?'PASS':'FAIL'}</td><td>${r.name}</td><td style="color:var(--ink-dim)">${r.detail||""}</td></tr>`).join("");
     document.getElementById("app").innerHTML=`<div id="tests">
-      <h1>BAYPLAN \u00b7 full-arc test harness (SOUNDING \u00b7 TRIM \u00b7 ROUTING \u00b7 SERVICES \u00b7 PLAT)</h1>
+      <h1>BAYPLAN \u00b7 full test harness (SOUNDING \u00b7 TRIM \u00b7 ROUTING \u00b7 SERVICES \u00b7 PLAT \u00b7 history)</h1>
       <div class="summary ${pass===total?'t-pass':'t-fail'}">${pass} / ${total} passing${pass===total?"  \u00b7 release gate green":"  \u00b7 gate RED"}</div>
       <table><tbody>${rows}</tbody></table>
       <p style="margin-top:18px"><a href="#" onclick="location.hash='';location.reload()">\u2190 back to plat</a></p></div>`;
