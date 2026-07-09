@@ -139,6 +139,42 @@ Each would follow the section-3 rationale table rather than inventing new depths
 
 ---
 
+## 6. SERVICES defaults (duct and electrical)
+
+This section pins the tunable defaults the SERVICES station uses, closing the elbow-equivalent open item from section 13 of the data-model spec. Like the clearance depths, these are defensible starting values, not gospel, and they live in the `Services` module of `bayplan.html`.
+
+### Duct elbow equivalents
+
+A fitting adds resistance equivalent to some length of straight duct. BAYPLAN charges each bend in a run an equivalent length, in feet, for one ninety-degree elbow at that diameter, and scales linearly for shallower bends (a forty-five-degree bend costs half a ninety).
+
+| Duct diameter | 90-degree elbow equivalent |
+|---------------|----------------------------|
+| 2.5 in | 4 ft |
+| 4 in | 6 ft |
+| 5 in | 7 ft |
+| 6 in | 9 ft |
+
+Elbows are inferred from a run's polyline: at each interior vertex the deflection from straight is measured, and the elbow charge is that table value times (deflection / 90). A straight run has no interior vertices and therefore no elbow charge. Auto-routed dust runs turn one orthogonal corner, so they carry exactly one ninety-degree elbow unless the collector and the machine port already share an axis.
+
+### Duct effective-length budget
+
+Effective length is straight run plus elbow equivalents. A run past the recommended maximum for its diameter earns a warning, on the principle that a long small-diameter run cannot keep chips moving.
+
+| Duct diameter | Recommended max effective length |
+|---------------|----------------------------------|
+| 2.5 in | 20 ft |
+| 4 in | 35 ft |
+| 5 in | 45 ft |
+| 6 in | 55 ft |
+
+These are rule-of-thumb ceilings for typical single-stage and cyclone collectors in a small shop, deliberately conservative. A precise design would compute static pressure against the collector's fan curve; that refinement is noted for a future pass.
+
+### Electrical rollup
+
+Each machine carries a `PowerReq` (voltage, amps, phase, dedicated). When a panel exists, SERVICES rolls up connected load into a 120V bucket and a 240V bucket. Two checks apply: a machine that needs 240V when no panel supplies it is an error, and connected load past eighty percent of the largest panel's main is a warning. For the load-versus-main comparison, 120V loads are counted at half their amperage, since two 120V circuits share a 240V main. Panel defaults are a 240V service at 100A main with 20 spaces; these are editable per node.
+
+---
+
 ## License
 
 GPL-3.0

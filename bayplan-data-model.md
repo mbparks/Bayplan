@@ -327,9 +327,9 @@ A machine deleted from QUARTERMASTER does **not** vanish from a BAYPLAN scenario
 
 Each open item now has a home station in the arc (section 14), so this list doubles as the close-out schedule for the build.
 
-- Default clearance depths per machine category for the built-in library seed. Home station: **ENVELOPE**.
-- Elbow-equivalent length table per duct diameter used in the dust-run warning. Home station: **SERVICES**.
-- Printable plat title-block fields (scale, north arrow, legend, revision). Home station: **PLAT**.
+- Default clearance depths per machine category for the built-in library seed. Home station: **ENVELOPE**. Closed: pinned in `bayplan-envelope-conventions.md` section 3.
+- Elbow-equivalent length table per duct diameter used in the dust-run warning. Home station: **SERVICES**. Closed: pinned in `bayplan-envelope-conventions.md` section 6.
+- Printable plat title-block fields (scale, north arrow, legend, revision). Home station: **PLAT**. Still open.
 
 ---
 

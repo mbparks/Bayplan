@@ -14,7 +14,7 @@ Three things, all in the data model rather than the UI:
 
 ## Status
 
-v0.0.2. The STOWAGE and TRIM stations are now live. You can add machines from the shelf, drag them around the floor, rotate, mirror, lock, and delete them, and the clearance checker (TRIM) runs on every change: footprints and halos light up red for errors and amber for warnings, with a running conflict list and a footer tally. The earlier v0.0.1 scaffold stood up the geometry core (rect-off-edge resolution, point-in-arc, and the placement transform with mirroring), the built-in library, the plat render, the theme system, and the test harness. Material flow and the utilities graph are specified and scheduled but not yet wired.
+v0.0.4. Four of the eight stations are live: STOWAGE, TRIM, ROUTING, and now SERVICES. Beyond placing machines, checking clearances, and tracing material flow, you can now lay the utilities graph: drop a dust collector and an electrical panel, drag them into place, and wire every machine to its nearest node in one click. SERVICES then reports dust-run effective length (straight run plus inferred elbow equivalents) against a per-diameter budget, and rolls up electrical load with a 240V-reachability check. The v0.0.1 scaffold stood up the geometry core, the built-in library, the plat render, the theme system, and the test harness.
 
 ## Repository layout
 
@@ -36,9 +36,13 @@ Open `bayplan.html` in a browser. It runs from `file://` with no server, no netw
 
 Editing: click a machine to select it, drag to move (snaps to one inch, hold Alt for free movement). With something selected, R rotates ninety degrees (Shift+R the other way), M mirrors, L locks, Delete removes, and arrow keys nudge by the grid. All of the same actions are available as buttons in the Selection panel for touch. Add machines from the shelf in the sidebar.
 
+Routing: in the Material flow panel, click New flow, then click machines in the order stock moves through them. Each click snaps to the nearest work point on that machine (its infeed or outfeed). The panel shows travel distance and backtrack count per flow, and a crossing count across flows. Undo point removes the last waypoint, Done finishes. Backspace undoes and Escape finishes from the keyboard.
+
+Utilities: in the Utilities panel, click Open utilities, then add a dust collector and an electrical panel. Drag each node where it belongs, then click Wire all to connect every machine to its nearest collector (dust) and panel (electrical). The panel reports dust-run effective lengths, connected electrical load, and any warnings; drag a node and the numbers update live. Select a node to remove it. Escape finishes.
+
 ## Tests
 
-The test harness is browser-runnable at `bayplan.html#test`, seeded with the built-in library as its fixture. It covers the geometry core (bounds with offset anchors, edge projection, point-in-polygon, the bearing convention, point-in-arc, the mirror transform, the placement transform, segment intersection, and polygon overlap) and the TRIM checker (the full severity-interaction matrix plus end-to-end scenarios: overlapping machines, out-of-bounds, a clear layout, and the shared-over-soft feed-lane coexistence case). The release gate is green only when every assertion passes.
+The test harness is browser-runnable at `bayplan.html#test`, seeded with the built-in library as its fixture. It covers the geometry core (bounds with offset anchors, edge projection, point-in-polygon, the bearing convention, point-in-arc, the mirror transform, the placement transform, segment intersection, and polygon overlap), the TRIM checker (the full severity-interaction matrix plus end-to-end scenarios), ROUTING (work-point snapping, travel distance, backtrack detection, and crossing detection), and SERVICES (elbow-equivalent inference, dust-run budget warnings, and the electrical rollup with voltage reachability). The release gate is green only when every assertion passes.
 
 ## Local frame convention
 
@@ -49,8 +53,12 @@ Origin at the machine anchor, +y back (away from the operator), +x to the operat
 - Only a single rectangular facility is supported in the UI. The model allows an arbitrary boundary polygon, but there is no wall-drawing tool yet, and features (doors, columns, windows) are not placeable, so door-swing conflicts are not checked.
 - Only one scenario. Scenario-compare (current versus proposed side by side) is in the data model but not in the UI.
 - Conflict checking is pairwise and geometric. It does not yet account for `minHeight`, so a feed lane passing over a low cabinet is still flagged as if the cabinet were full height. Honoring `minHeight` is the next refinement to TRIM.
-- No undo. Deleting or moving is immediate; recovery is by re-adding or dragging back.
-- Material flow and the utilities graph are specified only. No flow paths, no duct runs, no load rollups yet.
+- No undo for placement. Deleting or moving a machine is immediate; recovery is by re-adding or dragging back. (Flow routing does have an undo for the last waypoint.)
+- Flow waypoints snap to a machine's work points, or to its anchor when the machine has no work points defined. Only the flow-relevant machines in the seed (saw, jointer, planer, bandsaw, miter saw, CNC) carry work points; everything else routes through its anchor.
+- Backtrack detection uses the net start-to-end direction of a flow. A flow that returns exactly to its start (zero net travel) cannot report backtracks by this measure; genuine process flows have a net direction, so this is a corner case rather than a real limit.
+- The utilities graph auto-routes runs: dust as a single orthogonal L (one elbow), electrical as a straight line. There is no manual duct routing with multiple bends yet, so a real run with several elbows is under-counted. Effective-length and elbow math is in place for when manual routing lands.
+- The dust budget is a per-diameter rule-of-thumb ceiling, not a static-pressure calculation against the collector's fan curve. It is deliberately conservative and tunable; a true SP model is a future refinement.
+- Electrical rollup buckets load by voltage and checks 240V reachability and total load against the panel main. It does not yet assign individual circuits or check per-breaker load.
 - QUARTERMASTER seed import is designed (provenance fields are in the schema) but not implemented.
 - Annular arcs (with an inner radius) are supported in the model and sampled correctly, but no seed machine exercises one yet.
 - The plat export produces the JSON document, not a printable sheet. A full printable plat with legend and revision block is a PLAT-station item, still open.
@@ -58,7 +66,7 @@ Origin at the machine anchor, +y back (away from the operator), +x to the operat
 
 ## Roadmap
 
-BAYPLAN runs an eight-station arc: SOUNDING (set the floor), MANIFEST (build the library), ENVELOPE (define the halos), STOWAGE (place), TRIM (balance conflicts), ROUTING (material flow), SERVICES (utilities graph), PLAT (compare and issue). Delivered so far: ENVELOPE's built-in defaults, the render foundation, and now STOWAGE and TRIM. Next is ROUTING (material flow), then SERVICES (the utilities graph), with SOUNDING (a real wall-drawing tool and placeable features) and PLAT (scenario-compare and a printable sheet) rounding out the arc. See the station arc in `bayplan-data-model.md`.
+BAYPLAN runs an eight-station arc: SOUNDING (set the floor), MANIFEST (build the library), ENVELOPE (define the halos), STOWAGE (place), TRIM (balance conflicts), ROUTING (material flow), SERVICES (utilities graph), PLAT (compare and issue). Delivered so far: ENVELOPE's built-in defaults, the render foundation, STOWAGE, TRIM, ROUTING, and now SERVICES. What remains: SOUNDING (a real wall-drawing tool and placeable features, which also unlocks door-swing conflicts), the minHeight refinement to TRIM, and PLAT (scenario-compare and a printable sheet). See the station arc in `bayplan-data-model.md`.
 
 ## License
 

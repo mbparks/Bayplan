@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.2 | build-marker: stowage-trim-2026-07-08 -->
+<!-- BAYPLAN FI-075 | v0.0.4 | build-marker: services-2026-07-08 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -12,6 +12,7 @@
     --brass:#c9a24a; --grid:rgba(232,238,242,.06);
     --hard:#e0524a; --soft:#d8a13a; --shared:#3fa9a0;
     --footprint:#c4cfd8; --footprint-fill:rgba(196,207,216,.14);
+    --dust:#b3a17d; --power:#9a7fb8;
     --font-mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
     --font-sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   }
@@ -21,6 +22,7 @@
     --brass:#8a6d1f; --grid:rgba(23,34,44,.07);
     --hard:#c23a32; --soft:#a9761a; --shared:#1f7d74;
     --footprint:#3a4650; --footprint-fill:rgba(58,70,80,.10);
+    --dust:#8a7a52; --power:#6a4f88;
   }
   [data-theme="contrast"]{
     --ground:#000; --panel:#000; --panel-2:#0a0a0a;
@@ -28,6 +30,7 @@
     --brass:#ffd400; --grid:rgba(255,255,255,.16);
     --hard:#ff5b52; --soft:#ffc447; --shared:#33e0d4;
     --footprint:#ffffff; --footprint-fill:rgba(255,255,255,.10);
+    --dust:#ffd9a0; --power:#c9a0ff;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%}
@@ -115,7 +118,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.2  (STOWAGE + TRIM)
+   BAYPLAN FI-075  v0.0.4  (SERVICES: utilities graph)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -263,6 +266,28 @@ const Model = {
     const pl={id:this.newId(),defId,position:[Math.round(cx),Math.round(cy)],rotation:0,mirrored:false,
       locked:false,label:def.name.replace(/\s*\(.*$/,"")};
     sc.placements.push(pl); return pl;},
+  _fseq:0, newFlowId(){return "fl"+(++this._fseq);},
+  FLOW_COLORS:["#6ea8ff","#b48ead","#e06c9f","#5fc9c2","#c9a24a","#8fbf6a"],
+  addFlow(doc){const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
+    const n=sc.flows.length;
+    const fl={id:this.newFlowId(),name:"Flow "+(n+1),stockType:"",waypoints:[],
+      color:this.FLOW_COLORS[n%this.FLOW_COLORS.length]};
+    sc.flows.push(fl); return fl;},
+  removeFlow(doc,id){const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
+    sc.flows=sc.flows.filter(f=>f.id!==id);},
+  _nseq:0, newNodeId(){return "n"+(++this._nseq);},
+  addNode(doc,kind){const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
+    const fb=G.bounds(doc.facility.boundary);
+    const pos=kind==="dust_collector"?[Math.round(fb.maxX-24),Math.round(fb.minY+24)]
+             :[Math.round(fb.minX+18),Math.round(fb.minY+18)];
+    const spec=kind==="dust_collector"?{cfm:1200,staticPressure:10}
+             :kind==="panel"?{voltage:240,mainAmps:100,spaces:20}:{};
+    const node={id:this.newNodeId(),kind,position:pos,spec,
+      label:kind==="dust_collector"?"Collector":kind==="panel"?"Panel":kind};
+    sc.utilityNodes.push(node); return node;},
+  removeNode(doc,id){const sc=doc.scenarios.find(s=>s.id===doc.activeScenarioId);
+    sc.utilityNodes=sc.utilityNodes.filter(n=>n.id!==id);
+    sc.utilityRuns=sc.utilityRuns.filter(r=>r.fromNode!==id);},
   export(doc){const blob=new Blob([JSON.stringify(doc,null,2)],{type:"application/json"});
     const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
     a.download=(doc.meta.title||"bayplan").replace(/\s+/g,"-").toLowerCase()+".bayplan.json";
@@ -270,6 +295,152 @@ const Model = {
   import(file){return file.text().then(t=>{const d=JSON.parse(t);
     if(!d.facility||!Array.isArray(d.scenarios))throw new Error("Not a BAYPLAN document.");
     d.library=SEED.library; return d;});}
+};
+
+/* ---- ROUTING: flow waypoints + derived metrics ---- */
+const Flow = {
+  scenario(doc){return doc.scenarios.find(s=>s.id===doc.activeScenarioId);},
+  placement(doc,id){return this.scenario(doc).placements.find(p=>p.id===id);},
+  // world point of a waypoint: snap to a named port, else fall back to the anchor
+  wpWorld(doc,wp){
+    const pl=this.placement(doc,wp.placementId); if(!pl)return null;
+    const def=Model.def(pl.defId); if(!def)return null;
+    if(wp.portId){ const port=(def.ports||[]).find(p=>p.id===wp.portId);
+      if(port) return G.toWorld(port.position,pl); }
+    return pl.position.slice();
+  },
+  // pick the nearest port on a placement to a world point; null if the def has none
+  nearestPort(doc,pl,world){
+    const def=Model.def(pl.defId); const ports=def.ports||[];
+    if(!ports.length) return null;
+    let best=null,bd=Infinity;
+    for(const p of ports){const w=G.toWorld(p.position,pl);
+      const d=Math.hypot(w[0]-world[0],w[1]-world[1]); if(d<bd){bd=d;best=p;}}
+    return best?best.id:null;
+  },
+  points(doc,flow){return flow.waypoints.map(wp=>this.wpWorld(doc,wp)).filter(Boolean);},
+  segments(pts){const segs=[]; for(let i=0;i<pts.length-1;i++)segs.push([pts[i],pts[i+1]]); return segs;},
+  metrics(doc,flow){
+    const pts=this.points(doc,flow); const segs=this.segments(pts);
+    let dist=0; for(const s of segs) dist+=Math.hypot(s[1][0]-s[0][0],s[1][1]-s[0][1]);
+    // backtrack: a segment whose projection onto the overall start->end vector is negative
+    let back=0;
+    if(pts.length>=2){
+      const ov=[pts[pts.length-1][0]-pts[0][0], pts[pts.length-1][1]-pts[0][1]];
+      const ovm=Math.hypot(ov[0],ov[1]);
+      if(ovm>1e-6){ for(const s of segs){
+        const v=[s[1][0]-s[0][0],s[1][1]-s[0][1]];
+        if((v[0]*ov[0]+v[1]*ov[1])/ovm < -1e-6) back++;
+      }}
+    }
+    return {distanceIn:dist, feet:dist/12, backtracks:back, legs:segs.length, points:pts};
+  },
+  // crossings: segment intersections between different flows in the active scenario
+  crossings(doc){
+    const sc=this.scenario(doc); let count=0;
+    const all=sc.flows.map(f=>({id:f.id,segs:this.segments(this.points(doc,f))}));
+    for(let i=0;i<all.length;i++) for(let j=i+1;j<all.length;j++)
+      for(const a of all[i].segs) for(const b of all[j].segs)
+        if(G.segIntersect(a[0],a[1],b[0],b[1])) count++;
+    return count;
+  }
+};
+
+/* ---- SERVICES: utilities graph (electrical + dust) ---- */
+const Services = {
+  // equivalent length (feet of straight duct) for one 90-degree elbow, by diameter (in)
+  ELBOW_90_FT:{2.5:4, 4:6, 5:7, 6:9},
+  // recommended max effective run length (ft) before airflow suffers, by diameter (in)
+  MAX_EFFECTIVE_FT:{2.5:20, 4:35, 5:45, 6:55},
+  elbow90(d){const t=this.ELBOW_90_FT; if(t[d]!=null)return t[d];
+    const ks=Object.keys(t).map(Number).sort((a,b)=>a-b);
+    let k=ks[0]; for(const x of ks) if(x<=d)k=x; return t[k];},
+  maxEffective(d){const t=this.MAX_EFFECTIVE_FT; if(t[d]!=null)return t[d];
+    const ks=Object.keys(t).map(Number).sort((a,b)=>a-b);
+    let k=ks[0]; for(const x of ks) if(x<=d)k=x; return t[k];},
+  scenario(doc){return doc.scenarios.find(s=>s.id===doc.activeScenarioId);},
+  node(doc,id){return this.scenario(doc).utilityNodes.find(n=>n.id===id);},
+  machinePort(doc,pl,portLabel){const def=Model.def(pl.defId);
+    if(portLabel==="dust"&&def.dustPort) return G.toWorld(def.dustPort.position,pl);
+    return pl.position.slice();},
+  // derive a run's polyline: dust routes orthogonally (an L), electrical runs straight
+  routePolyline(doc,run){
+    const n=this.node(doc,run.fromNode); if(!n)return[];
+    const pl=this.scenario(doc).placements.find(p=>p.id===run.toPlacementId); if(!pl)return[];
+    const b=run.system==="dust"?this.machinePort(doc,pl,"dust"):pl.position.slice();
+    const a=n.position.slice();
+    if(run.system==="dust" && Math.abs(a[0]-b[0])>1e-6 && Math.abs(a[1]-b[1])>1e-6)
+      return [a,[b[0],a[1]],b]; // one 90-degree elbow at the corner
+    return [a,b];
+  },
+  polylineLenFt(poly){let d=0; for(let i=0;i<poly.length-1;i++)
+    d+=Math.hypot(poly[i+1][0]-poly[i][0],poly[i+1][1]-poly[i][1]); return d/12;},
+  // deflection angle (deg) at each interior vertex -> summed elbow-equivalent feet
+  elbowEquivFt(poly,dia){let ft=0;
+    for(let i=1;i<poly.length-1;i++){
+      const v1=[poly[i][0]-poly[i-1][0],poly[i][1]-poly[i-1][1]];
+      const v2=[poly[i+1][0]-poly[i][0],poly[i+1][1]-poly[i][1]];
+      const m1=Math.hypot(v1[0],v1[1]),m2=Math.hypot(v2[0],v2[1]); if(m1<1e-6||m2<1e-6)continue;
+      let cos=(v1[0]*v2[0]+v1[1]*v2[1])/(m1*m2); cos=Math.max(-1,Math.min(1,cos));
+      const turn=Math.acos(cos)*180/Math.PI; // deflection from straight
+      ft += this.elbow90(dia)*(turn/90);
+    }
+    return ft;},
+  dustRunReport(doc,run){
+    const poly=this.routePolyline(doc,run); const dia=run.spec.diameter||4;
+    const straight=this.polylineLenFt(poly); const elbow=this.elbowEquivFt(poly,dia);
+    const eff=straight+elbow; const max=this.maxEffective(dia);
+    return {straightFt:straight, elbowFt:elbow, effectiveFt:eff, maxFt:max, over:eff>max, diameter:dia};
+  },
+  // one-click wiring: connect every machine to its nearest collector (dust) and panel (electrical)
+  wireAll(doc){
+    const sc=this.scenario(doc);
+    const collectors=sc.utilityNodes.filter(n=>n.kind==="dust_collector");
+    const panels=sc.utilityNodes.filter(n=>n.kind==="panel");
+    sc.utilityRuns=[]; let rid=0;
+    const nearest=(nodes,pos)=>{let best=null,bd=Infinity;
+      for(const n of nodes){const d=Math.hypot(n.position[0]-pos[0],n.position[1]-pos[1]);
+        if(d<bd){bd=d;best=n;}} return best;};
+    for(const pl of sc.placements){const def=Model.def(pl.defId); if(!def)continue;
+      if(def.dustPort && collectors.length){const c=nearest(collectors,pl.position);
+        sc.utilityRuns.push({id:"r"+(++rid),system:"dust",fromNode:c.id,toPlacementId:pl.id,
+          spec:{diameter:def.dustPort.diameter}});}
+      if(def.power && panels.length){const p=nearest(panels,pl.position);
+        sc.utilityRuns.push({id:"r"+(++rid),system:"electrical",fromNode:p.id,toPlacementId:pl.id,
+          spec:{voltage:def.power.voltage,amps:def.power.amps}});}
+    }
+  },
+  clearRuns(doc){this.scenario(doc).utilityRuns=[];},
+  compute(doc){
+    const sc=this.scenario(doc); const recs=[]; const runs=sc.utilityRuns||[];
+    // dust
+    const dustRuns=runs.filter(r=>r.system==="dust"); let longest=0;
+    for(const r of dustRuns){const rep=this.dustRunReport(doc,r);
+      longest=Math.max(longest,rep.effectiveFt);
+      const pl=sc.placements.find(p=>p.id===r.toPlacementId); const nm=pl?(pl.label||Model.def(pl.defId).name):"?";
+      if(rep.over) recs.push({sev:"warning",text:`${nm} dust run ${rep.effectiveFt.toFixed(0)} ft effective exceeds ${rep.maxFt} ft for ${rep.diameter}in`});
+    }
+    // electrical
+    const panels=sc.utilityNodes.filter(n=>n.kind==="panel");
+    const panel240 = panels.some(p=>(p.spec.voltage||240)>=240);
+    let load120=0, load240=0;
+    const elec=runs.filter(r=>r.system==="electrical");
+    for(const r of elec){const a=r.spec.amps||0;
+      if((r.spec.voltage||120)>=240) load240+=a; else load120+=a; }
+    for(const pl of sc.placements){const def=Model.def(pl.defId); if(!def||!def.power)continue;
+      if(def.power.voltage>=240 && panels.length && !panel240)
+        recs.push({sev:"error",text:`${pl.label||def.name} needs 240V but no panel supplies it`});}
+    // total connected vs panel main (240V equivalent amps: 120V loads count half on a 240V main)
+    if(panels.length){
+      const main=Math.max(...panels.map(p=>p.spec.mainAmps||100));
+      const connected240 = load240 + load120/2;
+      if(connected240 > main*0.8)
+        recs.push({sev:"warning",text:`connected load ${connected240.toFixed(0)}A over 80% of ${main}A panel`});
+    }
+    const errors=recs.filter(r=>r.sev==="error").length, warnings=recs.filter(r=>r.sev==="warning").length;
+    return {records:recs, load120, load240, longestDustFt:longest, dustRunCount:dustRuns.length,
+      elecRunCount:elec.length, errors, warnings};
+  }
 };
 
 /* ---- render + interaction ---- */
@@ -314,6 +485,55 @@ const View = {
         const s1=this.toScreen([bb.minX,bb.maxY]),s2=this.toScreen([bb.maxX,bb.minY]);
         g+=`<rect x="${Math.min(s1[0],s2[0])-4}" y="${Math.min(s1[1],s2[1])-4}" width="${Math.abs(s2[0]-s1[0])+8}" height="${Math.abs(s2[1]-s1[1])+8}" fill="none" stroke="var(--brass)" stroke-width="1.5" stroke-dasharray="5 3" style="pointer-events:none"/>`;}
     }
+    // flows overlay
+    for(const fl of (sc.flows||[])){
+      const pts=Flow.points(doc,fl); if(pts.length<1)continue;
+      const sel=fl.id===UI.selectedFlowId||fl.id===UI.activeFlowId;
+      const wpx=pts.length>1?this.polyStr(pts):"";
+      if(pts.length>1)
+        g+=`<polyline points="${wpx}" fill="none" stroke="${fl.color}" stroke-width="${sel?3:2}" stroke-opacity="${sel?1:0.8}" stroke-linejoin="round" stroke-linecap="round" style="pointer-events:none"/>`;
+      // direction arrows at each segment midpoint
+      for(let i=0;i<pts.length-1;i++){
+        const a=this.toScreen(pts[i]),b=this.toScreen(pts[i+1]);
+        const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2, ang=Math.atan2(b[1]-a[1],b[0]-a[0]);
+        const s=4.5, c=Math.cos(ang),si=Math.sin(ang);
+        const p1=[mx+c*s,my+si*s], p2=[mx-c*s+si*s*0.9,my-si*s-c*s*0.9], p3=[mx-c*s-si*s*0.9,my-si*s+c*s*0.9];
+        g+=`<polygon points="${p1[0]},${p1[1]} ${p2[0]},${p2[1]} ${p3[0]},${p3[1]}" fill="${fl.color}" style="pointer-events:none"/>`;
+      }
+      // waypoint nodes
+      for(const p of pts){const a=this.toScreen(p);
+        g+=`<circle cx="${a[0]}" cy="${a[1]}" r="${sel?4:3}" fill="var(--ground)" stroke="${fl.color}" stroke-width="2" style="pointer-events:none"/>`;}
+    }
+    // route-mode: show snap-target ports on every machine
+    if(UI.mode==="route"){
+      for(const pl of sc.placements){const def=Model.def(pl.defId); if(!def)continue;
+        for(const port of (def.ports||[])){const w=G.toWorld(port.position,pl); const a=this.toScreen(w);
+          g+=`<circle cx="${a[0]}" cy="${a[1]}" r="3.5" fill="var(--brass)" fill-opacity="0.85" stroke="var(--ground)" stroke-width="1" style="pointer-events:none"/>`;}}
+    }
+    // utilities graph overlay
+    for(const run of (sc.utilityRuns||[])){
+      const poly=Services.routePolyline(doc,run); if(poly.length<2)continue;
+      if(run.system==="dust"){
+        const rep=Services.dustRunReport(doc,run);
+        const col=rep.over?"var(--hard)":"var(--dust)";
+        g+=`<polyline points="${this.polyStr(poly)}" fill="none" stroke="${col}" stroke-width="4" stroke-opacity="0.75" stroke-linejoin="round" stroke-linecap="round" style="pointer-events:none"/>`;
+      } else {
+        g+=`<polyline points="${this.polyStr(poly)}" fill="none" stroke="var(--power)" stroke-width="1.5" stroke-dasharray="2 4" stroke-opacity="0.85" style="pointer-events:none"/>`;
+      }
+    }
+    for(const nd of (sc.utilityNodes||[])){
+      const a=this.toScreen(nd.position); const selN=nd.id===UI.selectedNodeId;
+      if(nd.kind==="dust_collector"){
+        g+=`<circle cx="${a[0]}" cy="${a[1]}" r="7" fill="var(--dust)" stroke="var(--ground)" stroke-width="1.5"/>`;
+        g+=`<circle cx="${a[0]}" cy="${a[1]}" r="2.5" fill="var(--ground)" style="pointer-events:none"/>`;
+      } else if(nd.kind==="panel"){
+        g+=`<rect x="${a[0]-6}" y="${a[1]-8}" width="12" height="16" fill="var(--power)" stroke="var(--ground)" stroke-width="1.5"/>`;
+        g+=`<line x1="${a[0]-3}" y1="${a[1]-3}" x2="${a[0]+3}" y2="${a[1]-3}" stroke="var(--ground)" style="pointer-events:none"/>`;
+        g+=`<line x1="${a[0]-3}" y1="${a[1]+1}" x2="${a[0]+3}" y2="${a[1]+1}" stroke="var(--ground)" style="pointer-events:none"/>`;
+      }
+      g+=`<text x="${a[0]}" y="${a[1]-11}" fill="var(--ink)" font-size="8" font-family="var(--font-mono)" text-anchor="middle" style="pointer-events:none">${nd.label}</text>`;
+      if(selN) g+=`<circle cx="${a[0]}" cy="${a[1]}" r="11" fill="none" stroke="var(--brass)" stroke-width="1.5" stroke-dasharray="4 3" style="pointer-events:none"/>`;
+    }
     const bw=150,bh=54,bx=vbW-bw-6,by=vbH-bh-6;
     g+=`<g font-family="var(--font-mono)" style="pointer-events:none">
       <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="var(--panel)" stroke="var(--ink)" stroke-width="1"/>
@@ -333,9 +553,21 @@ const View = {
     svg.addEventListener("pointerdown",e=>{
       const w=this.screenToWorld(e.clientX,e.clientY);
       const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
+      if(UI.mode==="services"){
+        // hit-test utility nodes (within ~12in), drag/select; else deselect
+        let hn=null,bd=12;
+        for(const n of sc.utilityNodes){const d=Math.hypot(n.position[0]-w[0],n.position[1]-w[1]);
+          if(d<bd){bd=d;hn=n;}}
+        if(hn){ UI.selectNode(hn.id);
+          drag={node:hn.id,offX:w[0]-hn.position[0],offY:w[1]-hn.position[1]};
+          svg.setPointerCapture(e.pointerId);
+        } else UI.selectNode(null);
+        return;
+      }
       let hit=null;
       for(let i=sc.placements.length-1;i>=0;i--){const pl=sc.placements[i],def=Model.def(pl.defId);
         if(def&&G.pointInPolygon(w,G.footprintWorldPoly(def,pl))){hit=pl;break;}}
+      if(UI.mode==="route"){ if(hit) UI.addWaypoint(hit.id,Flow.nearestPort(this.doc,hit,w)); return; }
       if(hit){ UI.select(hit.id);
         if(!hit.locked){ drag={id:hit.id,offX:w[0]-hit.position[0],offY:w[1]-hit.position[1]};
           svg.setPointerCapture(e.pointerId); }
@@ -345,6 +577,10 @@ const View = {
       if(!drag)return;
       const w=this.screenToWorld(e.clientX,e.clientY);
       const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
+      if(drag.node){const nd=sc.utilityNodes.find(n=>n.id===drag.node); if(!nd)return;
+        let nx=w[0]-drag.offX, ny=w[1]-drag.offY;
+        if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
+        nd.position=[nx,ny]; this.refresh(); return;}
       const pl=sc.placements.find(p=>p.id===drag.id); if(!pl)return;
       let nx=w[0]-drag.offX, ny=w[1]-drag.offY;
       if(!e.altKey){nx=Math.round(nx); ny=Math.round(ny);}
@@ -358,9 +594,34 @@ const View = {
 
 /* ---- ui ---- */
 const UI = {
-  doc:null, selectedId:null,
+  doc:null, selectedId:null, mode:"select", activeFlowId:null, selectedFlowId:null, selectedNodeId:null,
   boot(){ if(location.hash==="#test"){Tests.run();return;}
     this.doc=Model.demo(); this.render();},
+  enterServices(){this.mode="services"; this.selectedId=null; this.selectedFlowId=null; this.activeFlowId=null; View.refresh();},
+  exitServices(){this.mode="select"; this.selectedNodeId=null; View.refresh();},
+  addNode(kind){Model.addNode(this.doc,kind); if(this.mode!=="services")this.mode="services"; View.refresh();},
+  wireAll(){Services.wireAll(this.doc); View.refresh();},
+  clearRuns(){Services.clearRuns(this.doc); View.refresh();},
+  selectNode(id){this.selectedNodeId=id; View.draw(); this.syncPanels();},
+  removeNode(id){Model.removeNode(this.doc,id); if(this.selectedNodeId===id)this.selectedNodeId=null; View.refresh();},
+  newFlow(){const fl=Model.addFlow(this.doc); this.mode="route"; this.activeFlowId=fl.id;
+    this.selectedFlowId=fl.id; this.selectedId=null; View.refresh();},
+  doneRouting(){ // discard an empty flow rather than leaving a stub
+    if(this.activeFlowId){const sc=Flow.scenario(this.doc);
+      const fl=sc.flows.find(f=>f.id===this.activeFlowId);
+      if(fl&&fl.waypoints.length<2) Model.removeFlow(this.doc,fl.id);}
+    this.mode="select"; this.activeFlowId=null; View.refresh();},
+  addWaypoint(placementId,portId){ if(!this.activeFlowId)return;
+    const sc=Flow.scenario(this.doc); const fl=sc.flows.find(f=>f.id===this.activeFlowId); if(!fl)return;
+    const last=fl.waypoints[fl.waypoints.length-1];
+    if(last&&last.placementId===placementId&&last.portId===portId)return; // no dup in a row
+    fl.waypoints.push({placementId,portId}); View.refresh();},
+  selectFlow(id){this.selectedFlowId=id; this.selectedId=null; View.refresh();},
+  removeFlow(id){Model.removeFlow(this.doc,id);
+    if(this.selectedFlowId===id)this.selectedFlowId=null;
+    if(this.activeFlowId===id){this.activeFlowId=null;this.mode="select";} View.refresh();},
+  undoWaypoint(){ if(!this.activeFlowId)return; const sc=Flow.scenario(this.doc);
+    const fl=sc.flows.find(f=>f.id===this.activeFlowId); if(fl&&fl.waypoints.length)fl.waypoints.pop(); View.refresh();},
   setTheme(t){document.documentElement.setAttribute("data-theme",t);
     for(const b of document.querySelectorAll("[data-theme-btn]"))
       b.setAttribute("aria-pressed",String(b.dataset.themeBtn===t));},
@@ -397,6 +658,8 @@ const UI = {
         <aside>
           <section id="selWrap"></section>
           <section id="trimWrap"></section>
+          <section id="flowWrap"></section>
+          <section id="svcWrap"></section>
           <section>
             <h2>Add from shelf <span class="count">${lib.length}</span></h2>
             <div class="shelf">${lib.map(m=>`<button data-add="${m.id}"><span>${m.name.replace(/\s*\(.*$/,'')}</span><span class="cat">${m.category}</span></button>`).join("")}</div>
@@ -412,7 +675,7 @@ const UI = {
       </main>
       <footer>
         <span id="trimTally"></span><span class="spacer"></span>
-        <span>drag to move \u00b7 R rotate \u00b7 M mirror \u00b7 Del remove</span>
+        <span id="modeHint">drag to move \u00b7 R rotate \u00b7 M mirror \u00b7 Del remove</span>
         <span><a href="#test" onclick="location.reload()">tests</a></span>
         <span>GPL-3.0</span>
       </footer>`;
@@ -431,6 +694,13 @@ const UI = {
   bindKeys(){
     document.onkeydown=e=>{
       if(e.target.tagName==="INPUT")return;
+      if(this.mode==="services"){
+        if(e.key==="Escape")this.exitServices();
+        else if((e.key==="Delete"||e.key==="Backspace")&&this.selectedNodeId){this.removeNode(this.selectedNodeId);e.preventDefault();}
+        return;
+      }
+      if(this.mode==="route"){ if(e.key==="Escape")this.doneRouting();
+        else if(e.key==="Backspace"){this.undoWaypoint();e.preventDefault();} return; }
       if(e.key==="Escape"){this.select(null);return;}
       const pl=this.selected(); if(!pl)return;
       if(e.key==="r"||e.key==="R"){this.rotate(e.shiftKey?-90:90);e.preventDefault();}
@@ -488,6 +758,88 @@ const UI = {
     const ft=document.getElementById("trimTally");
     if(ft){ if(c.errors===0&&c.warnings===0) ft.innerHTML=`<span class="ok">TRIM: clear</span>`;
       else ft.innerHTML=`TRIM: <span class="err">${c.errors} error${c.errors!==1?'s':''}</span> \u00b7 <span class="warn">${c.warnings} warning${c.warnings!==1?'s':''}</span>`; }
+    // ROUTING panel
+    const fw=document.getElementById("flowWrap");
+    if(fw){
+      const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
+      const flows=sc.flows||[]; const crossings=Flow.crossings(this.doc);
+      if(this.mode==="route"){
+        const fl=flows.find(f=>f.id===this.activeFlowId);
+        const n=fl?fl.waypoints.length:0;
+        fw.innerHTML=`<h2>Routing \u00b7 ${fl?fl.name:""}</h2>
+          <p class="empty" style="font-style:normal">Click machines in order to lay the stock path. It snaps to the nearest work point. ${n} waypoint${n!==1?'s':''} so far.</p>
+          <div class="row" style="display:flex; gap:6px; margin-top:8px">
+            <button data-fl="undo" ${n?'':'disabled'} style="flex:1">Undo point</button>
+            <button data-fl="done" style="flex:1">Done</button>
+          </div>`;
+        fw.querySelector('[data-fl="undo"]').onclick=()=>this.undoWaypoint();
+        fw.querySelector('[data-fl="done"]').onclick=()=>this.doneRouting();
+      } else {
+        let list;
+        if(flows.length===0)
+          list=`<p class="empty">No flows yet. Trace how stock moves through the shop to see travel distance, backtracks, and crossings.</p>`;
+        else list=`<ul class="placed">${flows.map(f=>{const m=Flow.metrics(this.doc,f);
+          const seld=f.id===this.selectedFlowId;
+          return `<li data-fl="${f.id}" aria-selected="${seld}"><span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${f.color};margin-right:6px"></span>${f.name}</span><span class="meta">${(m.feet).toFixed(1)} ft \u00b7 ${m.backtracks} back</span></li>`;}).join("")}</ul>
+          ${crossings>0?`<p class="trim" style="margin-top:8px;font-size:11.5px;color:var(--soft)">${crossings} path crossing${crossings!==1?'s':''}</p>`:``}`;
+        fw.innerHTML=`<h2>Material flow <span class="count">${flows.length}</span></h2>${list}
+          <div style="margin-top:8px"><button data-fl="new" style="width:100%">New flow</button></div>
+          ${this.selectedFlowId?`<button data-fl="delsel" class="danger" style="width:100%;margin-top:6px">Remove selected flow</button>`:``}`;
+        for(const li of fw.querySelectorAll("li[data-fl]")) li.onclick=()=>this.selectFlow(li.dataset.fl);
+        fw.querySelector('[data-fl="new"]').onclick=()=>this.newFlow();
+        const del=fw.querySelector('[data-fl="delsel"]'); if(del)del.onclick=()=>this.removeFlow(this.selectedFlowId);
+      }
+    }
+    // SERVICES panel
+    const vw=document.getElementById("svcWrap");
+    if(vw){
+      const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
+      const svc=Services.compute(this.doc);
+      const nodes=sc.utilityNodes||[]; const collectors=nodes.filter(n=>n.kind==="dust_collector").length;
+      const panels=nodes.filter(n=>n.kind==="panel").length;
+      if(this.mode==="services"){
+        const selN=nodes.find(n=>n.id===this.selectedNodeId);
+        const recBody = svc.records.length
+          ? `<ul class="trim" style="margin-top:8px">${svc.records.map(r=>`<li><span class="badge ${r.sev==='error'?'err':'warn'}">${r.sev==='error'?'ERR':'WARN'}</span> ${r.text}</li>`).join("")}</ul>`
+          : (sc.utilityRuns.length?`<p class="trim clear-msg" style="margin-top:8px">Utilities check clean.</p>`:``);
+        vw.innerHTML=`<h2>Utilities</h2>
+          <div class="row" style="display:flex; gap:6px; flex-wrap:wrap">
+            <button data-sv="collector" style="flex:1;min-width:110px">+ Collector</button>
+            <button data-sv="panel" style="flex:1;min-width:110px">+ Panel</button>
+          </div>
+          <div class="row" style="display:flex; gap:6px; margin-top:6px">
+            <button data-sv="wire" style="flex:1" ${(collectors||panels)?'':'disabled'}>Wire all</button>
+            <button data-sv="clear" style="flex:1" ${sc.utilityRuns.length?'':'disabled'}>Clear runs</button>
+          </div>
+          <div style="margin-top:8px; font-family:var(--font-mono); font-size:10.5px; color:var(--ink-dim); line-height:1.6">
+            dust runs ${svc.dustRunCount} \u00b7 longest ${svc.longestDustFt.toFixed(0)} ft eff.<br>
+            load ${svc.load120.toFixed(0)}A @120V \u00b7 ${svc.load240.toFixed(0)}A @240V
+          </div>
+          ${recBody}
+          ${selN?`<button data-sv="delnode" class="danger" style="width:100%;margin-top:8px">Remove ${selN.label}</button>`:``}
+          <button data-sv="exit" style="width:100%;margin-top:8px">Done</button>`;
+        vw.querySelector('[data-sv="collector"]').onclick=()=>this.addNode("dust_collector");
+        vw.querySelector('[data-sv="panel"]').onclick=()=>this.addNode("panel");
+        vw.querySelector('[data-sv="wire"]').onclick=()=>this.wireAll();
+        vw.querySelector('[data-sv="clear"]').onclick=()=>this.clearRuns();
+        vw.querySelector('[data-sv="exit"]').onclick=()=>this.exitServices();
+        const dn=vw.querySelector('[data-sv="delnode"]'); if(dn)dn.onclick=()=>this.removeNode(this.selectedNodeId);
+      } else {
+        const tally = (svc.errors||svc.warnings)
+          ? `<span style="color:${svc.errors?'var(--hard)':'var(--soft)'}">${svc.errors} error${svc.errors!==1?'s':''} \u00b7 ${svc.warnings} warning${svc.warnings!==1?'s':''}</span>`
+          : (nodes.length?`<span class="trim clear-msg">clean</span>`:`<span class="empty">not wired</span>`);
+        vw.innerHTML=`<h2>Utilities</h2>
+          <p style="font-size:12.5px; margin:0 0 8px">${tally}</p>
+          <button data-sv="enter" style="width:100%">Open utilities</button>`;
+        vw.querySelector('[data-sv="enter"]').onclick=()=>this.enterServices();
+      }
+    }
+    const mh=document.getElementById("modeHint");
+    if(mh) mh.textContent = this.mode==="route"
+      ? "routing: click machines in order \u00b7 Esc or Done to finish"
+      : this.mode==="services"
+      ? "utilities: drag nodes \u00b7 add collector/panel, then Wire all \u00b7 Esc to finish"
+      : "drag to move \u00b7 R rotate \u00b7 M mirror \u00b7 Del remove";
   }
 };
 
@@ -548,13 +900,90 @@ const Tests = {
     (()=>{const d=Model.emptyFacility(); d.scenarios[0].placements=[
       {id:"a",defId:"builtin-drill-press",position:[144,108],rotation:0,mirrored:false}];
       const c=Trim.compute(d); this.ok("TRIM: lone centered machine clear",c.errors===0&&c.warnings===0);})();
+    // ROUTING
+    (()=>{const s=lib.find(m=>m.id==="builtin-table-saw-cabinet");
+      this.ok("ROUTING: seed machines carry work points", (s.ports||[]).length>0, (s.ports||[]).length+" ports on saw");})();
+    (()=>{const d=Model.emptyFacility(); d.scenarios[0].placements=[
+      {id:"a",defId:"builtin-jointer-8in",position:[100,100],rotation:0,mirrored:false}];
+      const pl=d.scenarios[0].placements[0];
+      const near=Flow.nearestPort(d,pl,G.toWorld([36,0],pl)); // near stock_out (right)
+      this.ok("ROUTING: nearestPort snaps to closest work point",near==="out",near);})();
+    (()=>{const d=Model.emptyFacility(); d.scenarios[0].placements=[
+      {id:"a",defId:"builtin-jointer-8in",position:[60,100],rotation:0,mirrored:false},
+      {id:"b",defId:"builtin-table-saw-cabinet",position:[200,100],rotation:0,mirrored:false}];
+      const fl={id:"f",name:"F",waypoints:[{placementId:"a",portId:"out"},{placementId:"b",portId:"in"}],color:"#000"};
+      const m=Flow.metrics(d,fl);
+      this.ok("ROUTING: metric distance is positive",m.distanceIn>0,m.feet.toFixed(1)+" ft");
+      this.ok("ROUTING: straight run has no backtrack",m.backtracks===0);})();
+    (()=>{const d=Model.emptyFacility(); d.scenarios[0].placements=[
+      {id:"a",defId:"builtin-drill-press",position:[60,100],rotation:0,mirrored:false},
+      {id:"b",defId:"builtin-drill-press",position:[260,100],rotation:0,mirrored:false},
+      {id:"c",defId:"builtin-drill-press",position:[160,100],rotation:0,mirrored:false},
+      {id:"e",defId:"builtin-drill-press",position:[360,100],rotation:0,mirrored:false}];
+      // net travel is left-to-right; the b->c leg doubles back and should count as a backtrack
+      const fl={id:"f",name:"F",color:"#000",waypoints:[{placementId:"a"},{placementId:"b"},{placementId:"c"},{placementId:"e"}]};
+      const m=Flow.metrics(d,fl);
+      this.ok("ROUTING: a reverse leg counts as backtrack",m.backtracks===1,m.backtracks+" backtracks");})();
+    (()=>{const d=Model.emptyFacility(); d.scenarios[0].placements=[
+      {id:"a",defId:"builtin-jointer-8in",position:[60,60],rotation:0,mirrored:false},
+      {id:"b",defId:"builtin-jointer-8in",position:[200,200],rotation:0,mirrored:false},
+      {id:"c",defId:"builtin-jointer-8in",position:[60,200],rotation:0,mirrored:false},
+      {id:"e",defId:"builtin-jointer-8in",position:[200,60],rotation:0,mirrored:false}];
+      d.scenarios[0].flows=[
+        {id:"f1",name:"F1",color:"#000",waypoints:[{placementId:"a"},{placementId:"b"}]},
+        {id:"f2",name:"F2",color:"#111",waypoints:[{placementId:"c"},{placementId:"e"}]}];
+      this.ok("ROUTING: crossing flows are detected",Flow.crossings(d)>0,Flow.crossings(d)+" crossings");})();
+    (()=>{const d=Model.emptyFacility(); d.scenarios[0].placements=[
+      {id:"a",defId:"builtin-jointer-8in",position:[60,60],rotation:0,mirrored:false},
+      {id:"b",defId:"builtin-jointer-8in",position:[200,60],rotation:0,mirrored:false},
+      {id:"c",defId:"builtin-jointer-8in",position:[60,200],rotation:0,mirrored:false},
+      {id:"e",defId:"builtin-jointer-8in",position:[200,200],rotation:0,mirrored:false}];
+      d.scenarios[0].flows=[
+        {id:"f1",name:"F1",color:"#000",waypoints:[{placementId:"a"},{placementId:"b"}]},
+        {id:"f2",name:"F2",color:"#111",waypoints:[{placementId:"c"},{placementId:"e"}]}];
+      this.ok("ROUTING: parallel flows do not cross",Flow.crossings(d)===0);})();
+    (()=>{const d=Model.emptyFacility(); const fl=Model.addFlow(d);
+      this.ok("ROUTING: addFlow assigns a color and id",!!fl.color&&!!fl.id);})();
+    // SERVICES
+    this.ok("SERVICES: 90deg elbow equiv scales with diameter",
+      Services.elbow90(6)>Services.elbow90(4), Services.elbow90(4)+"->"+Services.elbow90(6)+" ft");
+    this.ok("SERVICES: straight duct has no elbow equivalent",
+      Services.elbowEquivFt([[0,0],[0,120]],4)===0);
+    this.ok("SERVICES: an L-run adds one 90deg elbow equivalent",
+      this.approx(Services.elbowEquivFt([[0,0],[120,0],[120,120]],4), Services.elbow90(4)),
+      Services.elbowEquivFt([[0,0],[120,0],[120,120]],4).toFixed(1)+" ft");
+    (()=>{const d=Model.emptyFacility();
+      d.scenarios[0].placements=[{id:"a",defId:"builtin-table-saw-cabinet",position:[60,60],rotation:0,mirrored:false}];
+      d.scenarios[0].utilityNodes=[{id:"c",kind:"dust_collector",position:[60,180],spec:{cfm:1200,staticPressure:10},label:"C"}];
+      Services.wireAll(d);
+      const dust=d.scenarios[0].utilityRuns.filter(r=>r.system==="dust");
+      this.ok("SERVICES: wireAll connects a machine with a dust port",dust.length===1,dust.length+" dust runs");})();
+    (()=>{const d=Model.emptyFacility();
+      // machine far from collector on a 4in run -> effective length exceeds the 35ft budget
+      d.scenarios[0].placements=[{id:"a",defId:"builtin-bandsaw-14in",position:[40,40],rotation:0,mirrored:false}];
+      d.scenarios[0].utilityNodes=[{id:"c",kind:"dust_collector",position:[560,560],spec:{cfm:1200,staticPressure:10},label:"C"}];
+      Services.wireAll(d);
+      const rep=Services.dustRunReport(d,d.scenarios[0].utilityRuns.find(r=>r.system==="dust"));
+      this.ok("SERVICES: a long 4in dust run trips the budget warning",rep.over,rep.effectiveFt.toFixed(0)+" > "+rep.maxFt+" ft");})();
+    (()=>{const d=Model.emptyFacility();
+      // 240V machine, but only a 120V panel present -> reachability error
+      d.scenarios[0].placements=[{id:"a",defId:"builtin-table-saw-cabinet",position:[100,100],rotation:0,mirrored:false}];
+      d.scenarios[0].utilityNodes=[{id:"p",kind:"panel",position:[20,20],spec:{voltage:120,mainAmps:100},label:"P"}];
+      Services.wireAll(d);
+      this.ok("SERVICES: 240V machine with 120V-only panel errors",Services.compute(d).errors>0);})();
+    (()=>{const d=Model.emptyFacility();
+      d.scenarios[0].placements=[{id:"a",defId:"builtin-table-saw-cabinet",position:[100,100],rotation:0,mirrored:false}];
+      d.scenarios[0].utilityNodes=[{id:"p",kind:"panel",position:[20,20],spec:{voltage:240,mainAmps:100},label:"P"}];
+      Services.wireAll(d);
+      const s=Services.compute(d);
+      this.ok("SERVICES: 240V machine on a 240V panel is clean",s.errors===0&&s.load240>0,s.load240+"A @240V");})();
     this.paint();
   },
   paint(){
     const pass=this.results.filter(r=>r.pass).length,total=this.results.length;
     const rows=this.results.map(r=>`<tr><td class="${r.pass?'t-pass':'t-fail'}">${r.pass?'PASS':'FAIL'}</td><td>${r.name}</td><td style="color:var(--ink-dim)">${r.detail||""}</td></tr>`).join("");
     document.getElementById("app").innerHTML=`<div id="tests">
-      <h1>BAYPLAN \u00b7 geometry + TRIM test harness</h1>
+      <h1>BAYPLAN \u00b7 geometry + TRIM + ROUTING + SERVICES test harness</h1>
       <div class="summary ${pass===total?'t-pass':'t-fail'}">${pass} / ${total} passing${pass===total?"  \u00b7 release gate green":"  \u00b7 gate RED"}</div>
       <table><tbody>${rows}</tbody></table>
       <p style="margin-top:18px"><a href="#" onclick="location.hash='';location.reload()">\u2190 back to plat</a></p></div>`;
