@@ -14,7 +14,9 @@ Three things, all in the data model rather than the UI:
 
 ## Status
 
-v0.0.32. The plat works on a phone now. Pinch to zoom and pan the drawing, spread and drag two fingers to move around, and a Zoom control (minus, Fit, plus) sits in the toolbar with the mouse wheel zooming toward the cursor on the desktop. Fit returns to the whole plat. Tap targets grow on touch devices, and the drawing no longer fights the browser's own gestures while you work. The coordinate math behind dragging, hard-won in v0.0.11 and v0.0.14, is preserved: zoom and pan compose with it rather than replacing it. Everything from the earlier releases stands.
+v0.0.33. The header is organized into logical groups now, separated by dividers and ordered by how you work: Scenarios (the scenario tabs, plus Scenario and Compare together), History (Undo, Redo), the drawing tools (Room, plus Machine, plus Dim, plus Note, Notes, Measure), View (zoom and units), Reports (the Ready badge, Takeoff, Panel, Lighting, Egress, Print), File (New, Import, Export, Publish), and Status (autosave and the theme). Nothing was removed; the same controls are just clustered so related actions sit together instead of scattering across the row.
+
+v0.0.32 brought the plat to touch: pinch to zoom and pan the drawing, spread and drag two fingers to move around, and a Zoom control (minus, Fit, plus) sits in the toolbar with the mouse wheel zooming toward the cursor on the desktop. Tap targets grow on touch devices, and the coordinate math behind dragging, hard-won in v0.0.11 and v0.0.14, is preserved: zoom and pan compose with it rather than replacing it. Everything from the earlier releases stands.
 
 The eight-station arc is complete and every depth item from the original roadmap has shipped: undo/redo (v0.0.8), the free-form wall tool and feature wall-snapping (v0.0.9), manual multi-bend flow paths and loop-aware backtracks (v0.0.10), manual duct routing with per-circuit electrical and the static-pressure model (v0.0.12), and the compare picker with fixed-scale multi-page printing (v0.0.13).
 
