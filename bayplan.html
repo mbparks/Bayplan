@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.37 | build-marker: nodes-draggable-in-select-2026-07-10 -->
+<!-- BAYPLAN FI-075 | v0.0.38 | build-marker: new-full-reset-2026-07-10 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -149,7 +149,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.37  (fix: utility nodes, incl. lights, are movable in select mode)
+   BAYPLAN FI-075  v0.0.38  (New is a confirmed full reset to a blank default)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -1676,6 +1676,18 @@ const UI = {
     this.render();
     const ok=this.storeAvailable()&&this.autosaveSave();
     this.setSaveState(ok?"saved":"off");},
+  newDoc(){
+    if(!(typeof confirm==="undefined") && !confirm("Clear everything and start over from a blank plan? This cannot be undone.")) return;
+    this.doc=Model.emptyFacility(); Model._doc=this.doc;
+    this.selectedId=this.selectedNodeId=this.selectedFeatureId=this.selectedRunId=null;
+    this.selectedAnnotationId=this.selectedDimensionId=this.selectedVertex=null;
+    this.selectedFlowId=this.activeFlowId=null;
+    this.mode="select"; this.dimDraft=this.dimHover=null; this.measurePts=null; this.draftWalls=null; this.panelId=null;
+    View._zoomed=false; View._view=null;
+    History.reset();
+    this.render();
+    const ok=this.storeAvailable()&&this.autosaveSave();
+    this.setSaveState(ok?"saved":"off");},
   undo(){const d=History.undo(); if(!d)return; History.suspend=true; this.doc=d;
     this.selectedId=this.selectedNodeId=this.selectedFeatureId=null; this.selectedVertex=null; this.selectedFlowId=null;
     this.render(); History.suspend=false;},
@@ -2571,7 +2583,7 @@ const UI = {
           </span>
           <span class="div"></span>
           <span class="grp" aria-label="File">
-            <button id="newBtn" title="Start a new plan">New</button>
+            <button id="newBtn" title="Clear everything and start over from a blank plan">New</button>
             <button id="importBtn" title="Open a .bayplan.json file">Import</button>
             <button id="exportBtn" title="Save a .bayplan.json file">Export</button>
             <button id="publishBtn" title="Bake a read-only plat to share">Publish</button>
@@ -2617,7 +2629,7 @@ const UI = {
       </footer>`;
     View.mount(document.getElementById("stage"));
     View.scene(this.doc);
-    document.getElementById("newBtn").onclick=()=>{this.doc=Model.emptyFacility(); this.selectedId=null; View.scene(this.doc);};
+    document.getElementById("newBtn").onclick=()=>this.newDoc();
     document.getElementById("exportBtn").onclick=()=>Model.export(this.doc);
     document.getElementById("publishBtn").onclick=()=>this.publishViewer();
     document.getElementById("dupBtn").onclick=()=>this.dupScenario();
@@ -3511,6 +3523,10 @@ const Tests = {
         Array.isArray(comp.records) && typeof Services.serviceLoad(d,p).ok==="boolean" && Services.circuitReport(d,p).length>0 &&
         Services.scenario(d).utilityRuns.filter(r=>r.system==="dust").every(r=>Services.dustRunSP(d,r).targetCfm>0));
       Model._doc=saveDoc;})();
+    // v0.0.38: New starts over from a clean default
+    (()=>{const d=Model.emptyFacility();
+      this.ok("RESET: a new plan is a blank default, empty room with no machines, nodes, or runs",
+        d.scenarios[0].placements.length===0 && (d.scenarios[0].utilityNodes||[]).length===0 && (d.scenarios[0].utilityRuns||[]).length===0 && d.facility.boundary.vertices.length===4 && (d.userLibrary||[]).length===0 && d.scenarios.length===1);})();
     // PLAT
     (()=>{const d=Model.emptyFacility();
       d.scenarios[0].placements=[{id:"a",defId:"builtin-drill-press",position:[100,100],rotation:0,mirrored:false}];
