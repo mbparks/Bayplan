@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.35 | build-marker: heatmap-fit-fix-2026-07-10 -->
+<!-- BAYPLAN FI-075 | v0.0.36 | build-marker: heatmap-definite-height-2026-07-10 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -66,6 +66,9 @@
   main{flex:1; display:flex; min-height:0}
   .stage{flex:1; position:relative; overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none}
   svg{width:100%; height:100%; display:block; touch-action:none}
+  /* heatmap report views (Lighting, Egress): definite-height box, SVG letterboxes to fit */
+  .heatwrap{background:#12161f; border-radius:8px; padding:6px; margin-top:10px; height:52vh}
+  .heatwrap svg{width:100%; height:100%; display:block}
   /* touch: bigger tap targets, room to breathe */
   @media (pointer:coarse){
     button{padding:11px 14px; font-size:13px; min-height:44px}
@@ -146,7 +149,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.35  (fix: lighting/circulation maps scale to fit, no clipping)
+   BAYPLAN FI-075  v0.0.36  (fix: lighting/egress maps use a definite-height box so they letterbox)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -2080,7 +2083,7 @@ const UI = {
       g+=`<polygon points="${fp}" fill="none" stroke="rgba(255,255,255,0.30)" stroke-width="0.8"/>`;
       const c=S(pl.position[0],pl.position[1]); g+=`<text x="${c[0].toFixed(1)}" y="${c[1].toFixed(1)}" fill="rgba(255,255,255,0.65)" font-size="7" font-family="ui-monospace,monospace" text-anchor="middle">${(pl.label||def.name).replace(/</g,'&lt;')}</text>`;}
     for(const f of cov.fixtures){const s=S(f.x,f.y); g+=`<circle cx="${s[0].toFixed(1)}" cy="${s[1].toFixed(1)}" r="2.5" fill="#fff" stroke="#333" stroke-width="0.6"/>`;}
-    return `<svg viewBox="0 0 ${W.toFixed(1)} ${Hd.toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;max-height:52vh;display:block">${g}</svg>`;
+    return `<svg viewBox="0 0 ${W.toFixed(1)} ${Hd.toFixed(1)}" preserveAspectRatio="xMidYMid meet">${g}</svg>`;
   },
   showLighting(){
     const H=this.lightHeight||108; const cov=Services.lightingCoverage(this.doc,{height:H});
@@ -2093,7 +2096,7 @@ const UI = {
         : avg>=30?`<span style="color:var(--soft)">adequate for general work; task areas want more</span>`
         : `<span style="color:var(--hard)">dim; add fixtures or lower them</span>`;
       const hv=View.uSize(H);
-      inner=`<div style="background:#12161f;border-radius:8px;padding:6px;margin-top:10px">${this.lightingSVG(cov)}</div>${legend}
+      inner=`<div class="heatwrap">${this.lightingSVG(cov)}</div>${legend}
         <div style="margin-top:12px; font-family:var(--font-mono); font-size:12.5px">
           <div>Average <b>${avg.toFixed(0)} fc</b> across ${cov.count} fixture${cov.count!==1?'s':''} \u00b7 ${verdict}</div>
           <div style="color:var(--ink-dim); margin-top:3px">range ${cov.minFc.toFixed(0)}\u2013${cov.maxFc.toFixed(0)} fc \u00b7 ${cov.pctGeneral.toFixed(0)}% of floor \u2265 30 fc \u00b7 ${cov.pctTask.toFixed(0)}% \u2265 75 fc</div></div>
@@ -2202,7 +2205,7 @@ const UI = {
       g+=`<polygon points="${fp}" fill="${bad?'rgba(192,57,43,0.30)':'rgba(255,255,255,0.06)'}" stroke="${bad?'#e0574f':'rgba(255,255,255,0.4)'}" stroke-width="${bad?1.6:0.8}"/>`;
       const c=S(pl.position[0],pl.position[1]); g+=`<text x="${c[0].toFixed(1)}" y="${c[1].toFixed(1)}" fill="rgba(255,255,255,0.7)" font-size="7" font-family="ui-monospace,monospace" text-anchor="middle">${(pl.label||def.name).replace(/</g,'&lt;')}</text>`;}
     for(const dp of cov.doorPts){const s=S(dp[0],dp[1]); g+=`<circle cx="${s[0].toFixed(1)}" cy="${s[1].toFixed(1)}" r="4" fill="#2f8f5b" stroke="#fff" stroke-width="1"/>`;}
-    return `<svg viewBox="0 0 ${W.toFixed(1)} ${Hd.toFixed(1)}" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;max-height:52vh;display:block">${g}</svg>`;
+    return `<svg viewBox="0 0 ${W.toFixed(1)} ${Hd.toFixed(1)}" preserveAspectRatio="xMidYMid meet">${g}</svg>`;
   },
   showCirculation(){
     const cov=Services.circulation(this.doc,{materialW:this.materialW||48});
@@ -2220,7 +2223,7 @@ const UI = {
       <span><span style="color:#2f8f5b">\u25cf</span> door</span></div>`;
     let inner;
     if(!cov.cells){ inner=`<p class="empty" style="margin-top:14px">Draw a room first.</p>`; }
-    else { inner=`<div style="background:#12161f;border-radius:8px;padding:6px;margin-top:10px">${this.circulationSVG(cov)}</div>${legend}
+    else { inner=`<div class="heatwrap">${this.circulationSVG(cov)}</div>${legend}
         <div style="margin-top:12px; font-family:var(--font-mono); font-size:12.5px">
           <div>Egress: ${egress}</div>
           <div style="margin-top:3px">Aisle serving the shop: <b>${cov.aisleWidth?cov.aisleWidth+' in'+(cov.aisleWidth>=72?'+':''):'under '+cov.personW+' in'}</b>${cov.narrowestDoor!=null?` \u00b7 narrowest door ${cov.narrowestDoor} in`:''}</div>
