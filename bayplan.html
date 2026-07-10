@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- BAYPLAN FI-075 | v0.0.36 | build-marker: heatmap-definite-height-2026-07-10 -->
+<!-- BAYPLAN FI-075 | v0.0.37 | build-marker: nodes-draggable-in-select-2026-07-10 -->
 <html lang="en" data-theme="night">
 <head>
 <meta charset="utf-8">
@@ -149,7 +149,7 @@
 <script>
 "use strict";
 /* ============================================================
-   BAYPLAN FI-075  v0.0.36  (fix: lighting/egress maps use a definite-height box so they letterbox)
+   BAYPLAN FI-075  v0.0.37  (fix: utility nodes, incl. lights, are movable in select mode)
    Local frame: origin=anchor, +y back, +x operator-right.
    Edges: front=minY, back=maxY, left=minX, right=maxX.
    Arc angles: degrees clockwise from +y. 0=back,90=right,180=front,270=left.
@@ -1587,6 +1587,10 @@ const View = {
           if(segd(w,dm.a,dm.b)<8){ UI.selectDimension(dm.id);
             drag={dimension:dm.id,dimEnd:null,offA:[w[0]-dm.a[0],w[1]-dm.a[1]],offB:[w[0]-dm.b[0],w[1]-dm.b[1]]};
             History.dragging=true; host.setPointerCapture(e.pointerId); return;}}}
+      // utility nodes (panel, outlets, fixtures, collector, compressor) are grabbable in select mode too
+      {let hn=null,bd=13; for(const n of (sc.utilityNodes||[])){const d=Math.hypot(n.position[0]-w[0],n.position[1]-w[1]); if(d<bd){bd=d;hn=n;}}
+        if(hn){ UI.selectNode(hn.id); drag={node:hn.id,offX:w[0]-hn.position[0],offY:w[1]-hn.position[1]};
+          History.dragging=true; host.setPointerCapture(e.pointerId); return;}}
       if(hit){ UI.select(hit.id);
         if(!hit.locked){ drag={id:hit.id,offX:w[0]-hit.position[0],offY:w[1]-hit.position[1]};
           History.dragging=true; host.setPointerCapture(e.pointerId); }
@@ -1727,7 +1731,9 @@ const UI = {
   addNode(kind){Model.addNode(this.doc,kind); if(this.mode!=="services")this.mode="services"; View.refresh();},
   wireAll(){Services.wireAll(this.doc); View.refresh();},
   clearRuns(){Services.clearRuns(this.doc); View.refresh();},
-  selectNode(id){this.selectedNodeId=id; this.selectedRunId=null; View.draw(); this.syncPanels();},
+  selectNode(id){this.selectedNodeId=id; this.selectedRunId=null;
+    this.selectedId=null; this.selectedAnnotationId=null; this.selectedDimensionId=null; this.selectedFeatureId=null;
+    View.draw(); this.syncPanels();},
   selectRun(id){this.selectedRunId=id; this.selectedNodeId=null; View.draw(); this.syncPanels();},
   addDustBend(runId,pt,atIndex){const sc=Services.scenario(this.doc);
     const run=(sc.utilityRuns||[]).find(r=>r.id===runId); if(!run)return;
@@ -1814,7 +1820,7 @@ const UI = {
       b.setAttribute("aria-pressed",String(b.dataset.themeBtn===t));},
   selected(){const sc=this.doc.scenarios.find(s=>s.id===this.doc.activeScenarioId);
     return sc.placements.find(p=>p.id===this.selectedId)||null;},
-  select(id){this.selectedId=id; this.selectedAnnotationId=null; this.selectedDimensionId=null; View.draw(); this.syncPanels();},
+  select(id){this.selectedId=id; this.selectedAnnotationId=null; this.selectedDimensionId=null; this.selectedNodeId=null; this.selectedRunId=null; View.draw(); this.syncPanels();},
   rotate(delta){const pl=this.selected(); if(!pl||pl.locked)return;
     pl.rotation=(((pl.rotation||0)+delta)%360+360)%360; View.refresh();},
   mirror(){const pl=this.selected(); if(!pl||pl.locked)return; pl.mirrored=!pl.mirrored; View.refresh();},
@@ -2694,6 +2700,13 @@ const UI = {
         return; }
       if(this.selectedAnnotationId){
         if(e.key==="Delete"||e.key==="Backspace"){this.removeAnnotation(this.selectedAnnotationId);e.preventDefault();}
+        return; }
+      if(this.selectedNodeId){
+        const nd=(Services.scenario(this.doc).utilityNodes||[]).find(n=>n.id===this.selectedNodeId);
+        if(e.key==="Delete"||e.key==="Backspace"){this.removeNode(this.selectedNodeId);e.preventDefault();}
+        else if(nd && e.key.startsWith("Arrow")){const g=this.doc.meta.gridSpacing||12;
+          const d={ArrowLeft:[-g,0],ArrowRight:[g,0],ArrowUp:[0,g],ArrowDown:[0,-g]}[e.key];
+          if(d){nd.position=[nd.position[0]+d[0],nd.position[1]+d[1]];View.refresh();e.preventDefault();}}
         return; }
       const pl=this.selected(); if(!pl)return;
       if(e.key==="r"||e.key==="R"){this.rotate(e.shiftKey?-90:90);e.preventDefault();}
