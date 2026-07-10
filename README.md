@@ -14,7 +14,7 @@ Three things, all in the data model rather than the UI:
 
 ## Status
 
-v0.0.35. Fixed a rendering bug in the Lighting and Egress maps: the heatmap could overflow its box and get clipped at the bottom instead of scaling to fit. The map now scales to the view and stays fully visible, and the printed version is unchanged.
+v0.0.36. Fixed the Lighting and Egress heatmaps: they were overflowing their box and getting clipped at the bottom. The map now sits in a definite-height frame and letterboxes to fit, so the whole floor is visible at any room shape, and the view scrolls if the details below run long. The printed map is unchanged.
 
 v0.0.34. The utilities have their own window now. The Systems button opens a full overview of the active scenario's power, dust, air, and light, rolled up in one place instead of scattered across the side panel. Four status tiles across the top give the headline for each system (connected load against the main, collector airflow, air demand against capacity, average foot-candles), then each section expands: the electrical section lists every panel with its service verdict and a full circuit directory (breaker, what it feeds, load); dust lists the collector and a per-branch table of effective length and delivered airflow against target; air shows the compressor with a demand-versus-capacity bar and its consumers; lighting gives the fixture count, connected load, and average level. Every open item the utility engine finds is gathered at the bottom, errors first, and the whole thing prints as a utilities schedule. Panel, Lighting, and Egress still drill into their specifics; Systems is the bird's-eye view over all of them.
 
